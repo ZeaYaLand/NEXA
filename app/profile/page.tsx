@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type User = {
@@ -14,13 +14,39 @@ type User = {
   createdAt: string;
 };
 
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('READ_FAILED'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('IMAGE_FAILED'));
+      image.onload = () => {
+        const max = 512;
+        const scale = Math.min(1, max / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('CANVAS_FAILED'));
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ProfilePage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ displayName: '', bio: '', avatarUrl: '' });
 
@@ -55,6 +81,34 @@ export default function ProfilePage() {
     setEditing(true);
   }
 
+  async function chooseAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Выбери изображение JPG, PNG или WebP.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Исходное изображение слишком большое. Максимум 10 МБ.');
+      return;
+    }
+    setUploading(true);
+    setError('');
+    try {
+      const dataUrl = await compressImage(file);
+      if (dataUrl.length > 290_000) {
+        setError('Не удалось сжать изображение до нужного размера. Выбери другое фото.');
+        return;
+      }
+      setForm((current) => ({ ...current, avatarUrl: dataUrl }));
+    } catch {
+      setError('Не удалось обработать изображение. Попробуй другое фото.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -70,8 +124,8 @@ export default function ProfilePage() {
       setUser(data.user);
       setForm({ displayName: data.user.displayName || '', bio: data.user.bio || '', avatarUrl: data.user.avatarUrl || '' });
       setEditing(false);
-    } catch {
-      setError('Не удалось сохранить изменения. Попробуй ещё раз.');
+    } catch (e) {
+      setError(e instanceof Error && e.message === 'AVATAR_TOO_LARGE' ? 'Аватар получился слишком большим. Выбери другое фото.' : 'Не удалось сохранить изменения. Попробуй ещё раз.');
     } finally {
       setSaving(false);
     }
@@ -124,11 +178,26 @@ export default function ProfilePage() {
         <div className="profile-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditing(false); }}>
           <form className="profile-modal" onSubmit={saveProfile}>
             <div className="profile-modal-head"><div><p className="eyebrow">NEXA PROFILE</p><h2>Редактировать профиль</h2></div><button type="button" className="modal-close" onClick={() => setEditing(false)}>×</button></div>
+
+            <div className="avatar-editor">
+              <div className="profile-avatar gradient avatar-editor-preview">
+                {form.avatarUrl ? <img src={form.avatarUrl} alt="Предпросмотр аватара" /> : initial}
+              </div>
+              <div className="avatar-editor-info">
+                <strong>Фото профиля</strong>
+                <span>JPG, PNG или WebP · до 10 МБ</span>
+                <button type="button" className="profile-action secondary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  {uploading ? 'Обрабатываем…' : 'Выбрать фото'}
+                </button>
+                <input ref={fileInputRef} className="avatar-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseAvatar} />
+              </div>
+            </div>
+
             <label>Имя<input value={form.displayName} maxLength={60} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="Как тебя зовут?" /></label>
             <label>О себе<textarea value={form.bio} maxLength={160} rows={4} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Расскажи немного о себе…" /></label>
-            <label>Ссылка на аватар<input value={form.avatarUrl} maxLength={500} onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })} placeholder="https://…" inputMode="url" /></label>
+            <details className="avatar-url-details"><summary>Использовать ссылку вместо фото</summary><input value={form.avatarUrl.startsWith('data:image/') ? '' : form.avatarUrl} maxLength={500} onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })} placeholder="https://…" inputMode="url" /></details>
             {error && <p className="profile-form-error">{error}</p>}
-            <div className="profile-modal-actions"><button type="button" className="profile-action secondary" onClick={() => setEditing(false)}>Отмена</button><button type="submit" className="profile-action primary" disabled={saving}>{saving ? 'Сохраняем…' : 'Сохранить'}</button></div>
+            <div className="profile-modal-actions"><button type="button" className="profile-action secondary" onClick={() => setEditing(false)}>Отмена</button><button type="submit" className="profile-action primary" disabled={saving || uploading}>{saving ? 'Сохраняем…' : 'Сохранить'}</button></div>
           </form>
         </div>
       )}
