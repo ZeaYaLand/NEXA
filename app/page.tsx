@@ -1,114 +1,12 @@
 'use client';
-
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-
-type User = { id: string; username: string; email: string };
-type Comment = { id: string; content: string; created_at: string; user_id: string; username: string };
-type Post = { id: string; content: string; created_at: string; user_id: string; username: string; like_count: number; comment_count: number; liked: boolean };
-
-export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [content, setContent] = useState('');
-  const [commentText, setCommentText] = useState<Record<string, string>>({});
-  const [comments, setComments] = useState<Record<string, Comment[]>>({});
-  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState('');
-
-  const loadPosts = async () => {
-    try {
-      const res = await fetch('/api/posts', { cache: 'no-store' });
-      const data = await res.json();
-      setPosts(data.posts ?? []);
-    } catch { setPosts([]); }
-  };
-
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/auth/me', { cache: 'no-store' }).then((res) => res.json()),
-      fetch('/api/posts', { cache: 'no-store' }).then((res) => res.json()),
-    ]).then(([me, postData]) => {
-      setUser(me.user ?? null);
-      setPosts(postData.posts ?? []);
-    }).catch(() => setError('Не удалось загрузить ленту'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const profileHref = user ? '/profile' : '/auth/login';
-  const initial = (user?.username?.[0] ?? 'N').toUpperCase();
-
-  const createPost = async () => {
-    if (!user) return;
-    setError(''); setPosting(true);
-    try {
-      const res = await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Ошибка публикации');
-      await loadPosts(); setContent('');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Ошибка публикации'); }
-    finally { setPosting(false); }
-  };
-
-  const toggleLike = async (post: Post) => {
-    if (!user) { setError('Войдите, чтобы ставить лайки'); return; }
-    const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' });
-    if (!res.ok) return;
-    const data = await res.json();
-    setPosts((items) => items.map((p) => p.id === post.id ? { ...p, liked: data.liked, like_count: data.count } : p));
-  };
-
-  const toggleComments = async (postId: string) => {
-    const next = !openComments[postId];
-    setOpenComments((v) => ({ ...v, [postId]: next }));
-    if (next && !comments[postId]) {
-      const res = await fetch(`/api/posts/${postId}/comments`, { cache: 'no-store' });
-      const data = await res.json();
-      setComments((v) => ({ ...v, [postId]: data.comments ?? [] }));
-    }
-  };
-
-  const addComment = async (postId: string) => {
-    if (!user) { setError('Войдите, чтобы комментировать'); return; }
-    const text = (commentText[postId] ?? '').trim();
-    if (!text) return;
-    const res = await fetch(`/api/posts/${postId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text }) });
-    const data = await res.json();
-    if (!res.ok) { setError(data.error ?? 'Ошибка комментария'); return; }
-    setComments((v) => ({ ...v, [postId]: [...(v[postId] ?? []), data.comment] }));
-    setPosts((items) => items.map((p) => p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
-    setCommentText((v) => ({ ...v, [postId]: '' }));
-  };
-
-  return (
-    <main className="shell">
-      <aside className="sidebar">
-        <div className="brand">NEXA<span>.</span></div>
-        <nav><Link className="active" href="/">Home</Link><Link href="/">Discover</Link><Link href="/">Messages</Link><Link href="/">Music</Link><Link href="/">Notifications</Link><Link href={profileHref}>Profile</Link></nav>
-        {!loading && !user && <Link className="create" href="/auth/register">＋ Create account</Link>}
-      </aside>
-
-      <section className="feed">
-        <header className="topbar"><div><p className="eyebrow">YOUR SPACE</p><h1>Home</h1></div><Link className="avatar" aria-label="Profile" href={profileHref}>{initial}</Link></header>
-        <div className="tabs"><button className="selected">For you</button><button>Following</button></div>
-
-        {user ? <article className="composer"><div className="mini-avatar">{initial}</div><div className="composer-content"><textarea value={content} onChange={(e) => setContent(e.target.value)} maxLength={2000} placeholder="What’s happening?" /><div className="composer-actions"><span>{content.length}/2000</span><button onClick={createPost} disabled={posting || !content.trim()}>{posting ? 'Posting…' : 'Post'}</button></div></div></article> : <article className="composer"><div className="composer-content"><p>Войдите, чтобы публиковать записи.</p><Link href="/auth/login">Войти</Link></div></article>}
-        {error && <p className="error">{error}</p>}
-        {posts.length === 0 && !loading && <article className="post"><p className="post-text">Пока нет публикаций. Будь первым.</p></article>}
-
-        {posts.map((post) => <article className="post" key={post.id}>
-          <div className="post-head"><div className="mini-avatar gradient">{post.username[0]?.toUpperCase() ?? 'N'}</div><div><strong>{post.username}</strong><span>@{post.username} · {new Date(post.created_at).toLocaleString()}</span></div><button className="more" type="button">•••</button></div>
-          <p className="post-text">{post.content}</p>
-          <div className="post-footer">
-            <button className={post.liked ? 'liked' : ''} onClick={() => toggleLike(post)}>♥ {post.like_count ?? 0}</button>
-            <button onClick={() => toggleComments(post)}>💬 {post.comment_count ?? 0}</button>
-            <button>↗ Share</button><button>Save</button>
-          </div>
-          {openComments[post.id] && <div className="comments"><div className="comment-list">{(comments[post.id] ?? []).map((c) => <div className="comment" key={c.id}><b>{c.username}</b><span>{c.content}</span></div>)}</div>{user && <div className="comment-form"><input value={commentText[post.id] ?? ''} onChange={(e) => setCommentText((v) => ({ ...v, [post.id]: e.target.value }))} maxLength={1000} placeholder="Написать комментарий…" /><button onClick={() => addComment(post.id)}>Отправить</button></div>}</div>}
-        </article>)}
-      </section>
-    </main>
-  );
-}
+import Link from 'next/link'; import {useEffect,useState} from 'react';
+type User={id:string;username:string;email:string}; type Comment={id:string;content:string;created_at:string;user_id:string;username:string}; type Post={id:string;content:string;created_at:string;user_id:string;username:string;like_count:number;comment_count:number;liked:boolean};
+export default function Home(){const[user,setUser]=useState<User|null>(null),[posts,setPosts]=useState<Post[]>([]),[content,setContent]=useState(''),[comments,setComments]=useState<Record<string,Comment[]>>({}),[commentText,setCommentText]=useState<Record<string,string>>({}),[open,setOpen]=useState<Record<string,boolean>>({}),[mode,setMode]=useState<'for-you'|'following'>('for-you'),[loading,setLoading]=useState(true),[posting,setPosting]=useState(false),[error,setError]=useState('');
+ const load=async(m=mode)=>{try{const r=await fetch(m==='following'?'/api/feed/following':'/api/posts',{cache:'no-store'}),d=await r.json();setPosts(d.posts??[]);if(!r.ok&&m==='following')setError('Подпишись на пользователей, чтобы увидеть их публикации.')}catch{setError('Не удалось загрузить ленту')}};
+ useEffect(()=>{Promise.all([fetch('/api/auth/me',{cache:'no-store'}).then(r=>r.json()),fetch('/api/posts',{cache:'no-store'}).then(r=>r.json())]).then(([m,p])=>{setUser(m.user??null);setPosts(p.posts??[])}).catch(()=>setError('Не удалось загрузить ленту')).finally(()=>setLoading(false))},[]);
+ const changeMode=async(m:'for-you'|'following')=>{setMode(m);setError('');await load(m)}; const initial=(user?.username?.[0]??'N').toUpperCase();
+ const createPost=async()=>{if(!user)return;setPosting(true);const r=await fetch('/api/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})}),d=await r.json();if(!r.ok)setError(d.error||'Ошибка публикации');else{setContent('');await load('for-you');}setPosting(false)};
+ const like=async(p:Post)=>{if(!user){setError('Войдите, чтобы ставить лайки');return}const r=await fetch(`/api/posts/${p.id}/like`,{method:'POST'});if(r.ok){const d=await r.json();setPosts(x=>x.map(q=>q.id===p.id?{...q,liked:d.liked,like_count:d.count}:q))}};
+ const toggleComments=async(id:string)=>{const n=!open[id];setOpen(x=>({...x,[id]:n}));if(n&&!comments[id]){const r=await fetch(`/api/posts/${id}/comments`),d=await r.json();setComments(x=>({...x,[id]:d.comments??[]}))}};
+ const addComment=async(id:string)=>{if(!user)return setError('Войдите, чтобы комментировать');const text=(commentText[id]??'').trim();if(!text)return;const r=await fetch(`/api/posts/${id}/comments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:text})}),d=await r.json();if(!r.ok)return setError(d.error||'Ошибка комментария');setComments(x=>({...x,[id]:[...(x[id]??[]),d.comment]}));setPosts(x=>x.map(p=>p.id===id?{...p,comment_count:p.comment_count+1}:p));setCommentText(x=>({...x,[id]:''}))};
+ return <main className="shell"><aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link className="active" href="/">Home</Link><Link href="/">Discover</Link><Link href="/">Messages</Link><Link href="/">Music</Link><Link href="/">Notifications</Link><Link href={user?'/profile':'/auth/login'}>Profile</Link></nav>{!loading&&!user&&<Link className="create" href="/auth/register">＋ Create account</Link>}</aside><section className="feed"><header className="topbar"><div><p className="eyebrow">YOUR SPACE</p><h1>Home</h1></div><Link className="avatar" href={user?'/profile':'/auth/login'}>{initial}</Link></header><div className="tabs"><button className={mode==='for-you'?'selected':''} onClick={()=>changeMode('for-you')}>For you</button><button className={mode==='following'?'selected':''} onClick={()=>changeMode('following')} disabled={!user}>Following</button></div>{user?<article className="composer"><div className="mini-avatar">{initial}</div><div className="composer-content"><textarea value={content} onChange={e=>setContent(e.target.value)} maxLength={2000} placeholder="What’s happening?"/><div className="composer-actions"><span>{content.length}/2000</span><button onClick={createPost} disabled={posting||!content.trim()}>{posting?'Posting…':'Post'}</button></div></div></article>:<article className="composer"><div className="composer-content"><p>Войдите, чтобы публиковать записи.</p><Link href="/auth/login">Войти</Link></div></article>}{error&&<p className="error">{error}</p>}{posts.length===0&&!loading&&<article className="post"><p className="post-text">{mode==='following'?'Нет публикаций от подписок.':'Пока нет публикаций. Будь первым.'}</p></article>}{posts.map(p=><article className="post" key={p.id}><div className="post-head"><div className="mini-avatar gradient">{p.username[0]?.toUpperCase()??'N'}</div><div><strong>{p.username}</strong><span>@{p.username} · {new Date(p.created_at).toLocaleString()}</span></div><button className="more">•••</button></div><p className="post-text">{p.content}</p><div className="post-footer"><button className={p.liked?'liked':''} onClick={()=>like(p)}>♥ {p.like_count??0}</button><button onClick={()=>toggleComments(p.id)}>💬 {p.comment_count??0}</button><button>↗ Share</button><button>Save</button></div>{open[p.id]&&<div className="comments"><div className="comment-list">{(comments[p.id]??[]).map(c=><div className="comment" key={c.id}><b>{c.username}</b><span>{c.content}</span></div>)}</div>{user&&<div className="comment-form"><input value={commentText[p.id]??''} onChange={e=>setCommentText(x=>({...x,[p.id]:e.target.value}))} maxLength={1000} placeholder="Написать комментарий…"/><button onClick={()=>addComment(p.id)}>Отправить</button></div>}</div>}</article>)}</section></main>}
