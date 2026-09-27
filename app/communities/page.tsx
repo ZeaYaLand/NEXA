@@ -3,18 +3,55 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import styles from './communities.module.css';
 
-type Community={id:string;type:'group'|'channel';name:string;description:string|null;username?:string|null;is_public:boolean;members:number;admins:number};
+type Community={id:string;type:'group'|'channel';name:string;description:string|null;username?:string|null;is_public:boolean;members:number;admins:number;is_owner?:boolean};
+
 export default function CommunitiesPage(){
- const [tab,setTab]=useState<'all'|'groups'|'channels'>('all'); const [items,setItems]=useState<Community[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
+ const [tab,setTab]=useState<'all'|'groups'|'channels'>('all');
+ const [items,setItems]=useState<Community[]>([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState('');
+ const [query,setQuery]=useState('');
  const [form,setForm]=useState({name:'',description:'',privacy:'public' as 'public'|'private',type:'group' as 'group'|'channel',username:''});
- async function load(){setLoading(true);try{const r=await fetch('/api/communities',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка загрузки');setItems(d.communities||[]);setError('')}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}finally{setLoading(false)}}
- useEffect(()=>{load()},[]);
- async function create(){const name=form.name.trim();if(!name)return;setError('');try{const r=await fetch('/api/communities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:form.description,type:form.type,isPublic:form.privacy==='public',username:form.username})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не удалось создать');setForm({name:'',description:'',privacy:'public',type:'group',username:''});await load();}catch(e){setError(e instanceof Error?e.message:'Не удалось создать')}}
+
+ async function load(search=query){
+  setLoading(true);
+  try{
+   const r=await fetch(`/api/communities${search.trim()?`?q=${encodeURIComponent(search.trim())}`:''}`,{cache:'no-store'});
+   const d=await r.json();
+   if(!r.ok) throw new Error(d.error||'Ошибка загрузки');
+   setItems(d.communities||[]); setError('');
+  }catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}
+  finally{setLoading(false)}
+ }
+ useEffect(()=>{load('')},[]);
+
+ async function create(){
+  const name=form.name.trim(); if(!name)return;
+  setError('');
+  try{
+   const r=await fetch('/api/communities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,description:form.description,type:form.type,isPublic:form.privacy==='public',username:form.username})});
+   const d=await r.json(); if(!r.ok)throw new Error(d.error||'Не удалось создать');
+   setForm({name:'',description:'',privacy:'public',type:'group',username:''}); await load(query);
+  }catch(e){setError(e instanceof Error?e.message:'Не удалось создать')}
+ }
+
+ async function removeCommunity(x:Community){
+  if(!confirm(`Удалить ${x.type==='channel'?'канал':'группу'} «${x.name}»? Это действие необратимо.`))return;
+  setError('');
+  try{
+   const r=await fetch(`/api/communities/${x.id}`,{method:'DELETE'}); const d=await r.json();
+   if(!r.ok)throw new Error(d.error||'Не удалось удалить');
+   setItems(prev=>prev.filter(i=>i.id!==x.id));
+  }catch(e){setError(e instanceof Error?e.message:'Не удалось удалить')}
+ }
+
  const visible=items.filter(x=>tab==='all'||(tab==='groups'?x.type==='group':x.type==='channel'));
- return <main className="shell"><aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Home</Link><Link href="/search">Search</Link><Link href="/messages">Messages</Link><Link href="/notifications">Notifications</Link><Link href="/profile">Profile</Link><Link className="active" href="/communities">Groups & Channels</Link><Link href="/settings">Settings</Link></nav></aside><section className="feed"><header className="topbar"><div><p className="eyebrow">NEXA COMMUNITIES</p><h1>Группы и каналы</h1></div><Link className="avatar" href="/profile">N</Link></header>
- <section className={styles.hero}><div><span className={styles.badge}>COMMUNITIES</span><h2>Твои пространства</h2><p>Настоящие группы и каналы NEXA.</p></div><span className={styles.count}>{items.length}</span></section>
+ return <main className="shell"><aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Home</Link><Link href="/search">Search</Link><Link href="/messages">Messages</Link><Link href="/notifications">Notifications</Link><Link href="/profile">Profile</Link><Link className="active" href="/communities">Groups & Channels</Link><Link href="/settings">Settings</Link></nav></aside><section className="feed">
+ <header className="topbar"><div><p className="eyebrow">NEXA COMMUNITIES</p><h1>Группы и каналы</h1></div><Link className="avatar" href="/profile">N</Link></header>
+ <section className={styles.hero}><div><span className={styles.badge}>COMMUNITIES</span><h2>Открытые пространства</h2><p>Публичные группы и каналы видны всем пользователям NEXA.</p></div><span className={styles.count}>{items.length}</span></section>
+ <section className={styles.createCard}><h2>Поиск</h2><div style={{display:'flex',gap:8}}><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')load(query)}} placeholder="Название, @username или описание" maxLength={80}/><button className={styles.manage} onClick={()=>load(query)}>Найти</button></div></section>
  <div className={styles.tabs}><button className={tab==='all'?styles.selected:''} onClick={()=>setTab('all')}>Все</button><button className={tab==='groups'?styles.selected:''} onClick={()=>setTab('groups')}>👥 Группы</button><button className={tab==='channels'?styles.selected:''} onClick={()=>setTab('channels')}>📢 Каналы</button></div>
- <section className={styles.createCard}><h2>Создать</h2><div className={styles.typeSwitch}><button className={form.type==='group'?styles.selected:''} onClick={()=>setForm({...form,type:'group'})}>👥 Группу</button><button className={form.type==='channel'?styles.selected:''} onClick={()=>setForm({...form,type:'channel'})}>📢 Канал</button></div><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder={form.type==='group'?'Название группы':'Название канала'} maxLength={60}/><input value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="@username (необязательно)" maxLength={32}/><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Описание" maxLength={300}/><select value={form.privacy} onChange={e=>setForm({...form,privacy:e.target.value as 'public'|'private'})}><option value="public">🌐 Публичное</option><option value="private">🔒 Приватное</option></select>{error&&<p role="alert">{error}</p>}<button className={styles.primary} onClick={create} disabled={loading}>Создать {form.type==='group'?'группу':'канал'}</button></section>
- <section className={styles.list}>{loading?<div className={styles.empty}><h3>Загрузка…</h3></div>:visible.length===0?<div className={styles.empty}><div>✦</div><h3>Пока ничего нет</h3><p>Создай первую группу или канал выше.</p></div>:visible.map(x=><article className={styles.item} key={x.id}><div className={styles.icon}>{x.type==='group'?'👥':'📢'}</div><div className={styles.info}><h3>{x.name}</h3><p>{x.description||'Без описания'}</p><small>{x.is_public?'🌐 Публичное':'🔒 Приватное'} · {x.members} участников · {x.admins} администраторов{x.username?` · @${x.username}`:''}</small></div><Link className={styles.manage} href={`/messages?conversation=${x.id}`}>Открыть</Link></article>)}</section>
+ <section className={styles.createCard}><h2>Создать</h2><div className={styles.typeSwitch}><button className={form.type==='group'?styles.selected:''} onClick={()=>setForm({...form,type:'group'})}>👥 Группу</button><button className={form.type==='channel'?styles.selected:''} onClick={()=>setForm({...form,type:'channel'})}>📢 Канал</button></div><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder={form.type==='group'?'Название группы':'Название канала'} maxLength={60}/><input value={form.username} onChange={e=>setForm({...form,username:e.target.value})} placeholder="@username (необязательно)" maxLength={32}/><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Описание" maxLength={300}/><select value={form.privacy} onChange={e=>setForm({...form,privacy:e.target.value as 'public'|'private'})}><option value="public">🌐 Публичное — видно всем</option><option value="private">🔒 Приватное — только участникам</option></select>{error&&<p role="alert">{error}</p>}<button className={styles.primary} onClick={create} disabled={loading}>Создать {form.type==='group'?'группу':'канал'}</button></section>
+ <section className={styles.list}>{loading?<div className={styles.empty}><h3>Загрузка…</h3></div>:visible.length===0?<div className={styles.empty}><div>✦</div><h3>Ничего не найдено</h3><p>Попробуй другое название или @username.</p></div>:visible.map(x=><article className={styles.item} key={x.id}><div className={styles.icon}>{x.type==='group'?'👥':'📢'}</div><div className={styles.info}><h3>{x.name}</h3><p>{x.description||'Без описания'}</p><small>{x.is_public?'🌐 Публичное':'🔒 Приватное'} · {x.members} участников · {x.admins} администраторов{x.username?` · @${x.username}`:''}</small></div><div className={styles.actions}><Link className={styles.manage} href={`/messages?conversation=${x.id}`}>Открыть</Link>{x.is_owner&&<button className={styles.danger} onClick={()=>removeCommunity(x)}>Удалить</button>}</div></article>)}</section>
  </section></main>;
 }
