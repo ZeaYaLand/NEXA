@@ -5,10 +5,11 @@ import { useEffect } from 'react';
 const qs = <T extends Element>(selector: string) => document.querySelector<T>(selector);
 
 function setStatus(online: boolean) {
-  const handle = qs<HTMLElement>('[class*="chatHandle"]');
+  const handle = qs<HTMLElement>('[class*="chatPresence"], [class*="chatHandle"]');
   if (!handle) return;
   handle.dataset.presenceBase ??= handle.textContent || '';
-  handle.textContent = `${handle.dataset.presenceBase} · ${online ? '🟢 В сети' : '⚪ Не в сети'}`;
+  const base = handle.dataset.presenceBase.replace(/\s*[·•]\s*[🟢⚪]\s*(В сети|Не в сети).*$/u, '').trim();
+  handle.textContent = `${base} · ${online ? '🟢 В сети' : '⚪ Не в сети'}`;
 }
 
 function setProfileStatus(online: boolean) {
@@ -58,7 +59,7 @@ export default function PresenceSync() {
         if (conversation) {
           const [p, t] = await Promise.all([
             originalFetch(`/api/presence?conversation=${encodeURIComponent(conversation)}`, { cache: 'no-store' }),
-            originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, { cache: 'no-store' })
+            originalFetch(`/api/messages/typing?conversation=${encodeURIComponent(conversation)}`, { cache: 'no-store' })
           ]);
           if (p.ok) {
             const presence = await p.json();
@@ -86,10 +87,10 @@ export default function PresenceSync() {
     const sendTyping = (typing: boolean) => {
       const conversation = getConversation();
       if (!conversation) return;
-      originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, {
+      originalFetch('/api/messages/typing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ typing })
+        body: JSON.stringify({ conversationId: conversation, typing })
       }).catch(() => {});
     };
 
