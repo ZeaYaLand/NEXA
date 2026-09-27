@@ -19,6 +19,8 @@ export async function GET(){
 export async function POST(req:NextRequest){
  const user=await getCurrentUser(); if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});
  const b=await req.json(); const target=String(b.userId||''); if(!target||target===user.id)return NextResponse.json({error:'Invalid user'},{status:400});
+ const blocked=await db.query('SELECT 1 FROM user_blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1) LIMIT 1',[user.id,target]);
+ if(blocked.rowCount) return NextResponse.json({error:'Пользователь заблокирован'},{status:403});
  const found=await db.query(`SELECT c.id FROM conversations c JOIN conversation_members a ON a.conversation_id=c.id AND a.user_id=$1 JOIN conversation_members b ON b.conversation_id=c.id AND b.user_id=$2 WHERE c.type='direct' AND (SELECT count(*) FROM conversation_members x WHERE x.conversation_id=c.id)=2 LIMIT 1`,[user.id,target]);
  let id=found.rows[0]?.id; if(!id){const c=await db.query("INSERT INTO conversations(type) VALUES('direct') RETURNING id"); id=c.rows[0].id; await db.query('INSERT INTO conversation_members(conversation_id,user_id,role,status) VALUES($1,$2,\'member\',\'active\'),($1,$3,\'member\',\'active\')',[id,user.id,target]);}
  return NextResponse.json({conversationId:id});
