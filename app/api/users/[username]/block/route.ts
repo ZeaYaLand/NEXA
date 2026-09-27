@@ -9,7 +9,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ userna
   const target = await db.query('SELECT id FROM users WHERE username=$1 LIMIT 1', [username.toLowerCase()]);
   if (!target.rows[0]) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const block = await db.query('SELECT 1 FROM user_blocks WHERE blocker_id=$1 AND blocked_id=$2 LIMIT 1', [user.id, target.rows[0].id]);
-  return NextResponse.json({ blocked: block.rowCount > 0 });
+  return NextResponse.json({ blocked: Number(block.rowCount ?? 0) > 0 });
 }
 
 export async function POST(_: NextRequest, { params }: { params: Promise<{ username: string }> }) {
