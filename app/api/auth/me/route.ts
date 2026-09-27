@@ -7,7 +7,8 @@ export async function GET() {
   if (!token) return NextResponse.json({ user: null });
   try {
     const payload = verifyToken(token);
-    return NextResponse.json({ user: getUser(payload.sub) });
+    const user = await getUser(payload.sub);
+    return NextResponse.json({ user });
   } catch {
     return NextResponse.json({ user: null });
   }
