@@ -28,6 +28,12 @@ function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status });
 }
 
+function parseMediaKey(key: string) {
+  const match = key.match(/^messages\/([^/]+)\/([^/]+)\/[^/]+$/);
+  if (!match) return null;
+  return { conversationId: match[1], senderId: match[2] };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -45,11 +51,8 @@ export async function POST(req: NextRequest) {
     const fileName = String(body.fileName || 'file')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
       .slice(0, 180);
-    const contentType = String(
-      body.mimeType || body.contentType || 'application/octet-stream'
-    );
-    const rawSize = body.fileSize ?? body.size;
-    const size = Number(rawSize);
+    const contentType = String(body.mimeType || body.contentType || 'application/octet-stream');
+    const size = Number(body.fileSize ?? body.size);
 
     if (!conversationId || !(await allowed(conversationId, user.id))) {
       return jsonError('Forbidden', 403);
@@ -71,20 +74,14 @@ export async function POST(req: NextRequest) {
           ? 'audio'
           : 'file';
 
-    const key =
-      `messages/${conversationId}/${user.id}/` +
-      `${Date.now()}-${crypto.randomUUID()}-${fileName}`;
+    const key = `messages/${conversationId}/${user.id}/${Date.now()}-${crypto.randomUUID()}-${fileName}`;
 
     let response: Response;
     try {
       response = await fetch(`${FUNCTION_URL.replace(/\/$/, '')}/presign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operation: 'upload',
-          key,
-          contentType,
-        }),
+        body: JSON.stringify({ operation: 'upload', key, contentType }),
       });
     } catch (error) {
       console.error('Media upload presign fetch failed:', error);
@@ -94,18 +91,12 @@ export async function POST(req: NextRequest) {
     const data = await readJsonResponse(response);
 
     if (!response.ok) {
-      const message =
-        typeof data?.error === 'string'
-          ? data.error
-          : `Ошибка хранилища (${response.status})`;
+      const message = typeof data?.error === 'string' ? data.error : `Ошибка хранилища (${response.status})`;
       return jsonError(message, 502);
     }
 
     if (!data || typeof data.url !== 'string' || !data.url) {
-      console.error('Invalid upload presign response:', {
-        status: response.status,
-        data,
-      });
+      console.error('Invalid upload presign response:', { status: response.status, data });
       return jsonError('Хранилище не вернуло URL загрузки', 502);
     }
 
@@ -130,8 +121,14 @@ export async function GET(req: NextRequest) {
     if (!FUNCTION_URL) return jsonError('Media storage is not configured', 503);
 
     const key = new URL(req.url).searchParams.get('key') || '';
+    const parsed = parseMediaKey(key);
 
-    if (!key || !key.includes(`/${user.id}/`)) {
+    if (!parsed) return jsonError('Некорректный media key', 400);
+
+    // The file is owned by the sender, but the recipient must also be able
+    // to view it. Authorize by conversation membership instead of requiring
+    // the current user's id to be present in the storage key.
+    if (!(await allowed(parsed.conversationId, user.id))) {
       return jsonError('Forbidden', 403);
     }
 
@@ -150,18 +147,13 @@ export async function GET(req: NextRequest) {
     const data = await readJsonResponse(response);
 
     if (!response.ok) {
-      const message =
-        typeof data?.error === 'string'
-          ? data.error
-          : `Ошибка хранилища (${response.status})`;
+      const message = typeof data?.error === 'string' ? data.error : `Ошибка хранилища (${response.status})`;
+      console.error('Media download presign returned error:', response.status, data);
       return jsonError(message, 502);
     }
 
     if (!data || typeof data.url !== 'string' || !data.url) {
-      console.error('Invalid download presign response:', {
-        status: response.status,
-        data,
-      });
+      console.error('Invalid download presign response:', { status: response.status, data });
       return jsonError('Хранилище не вернуло URL файла', 502);
     }
 
