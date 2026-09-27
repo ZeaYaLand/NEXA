@@ -2,20 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const q = new URL(req.url).searchParams.get('q')?.trim() || '';
+  const like = `%${q}%`;
   const r = await db.query(`
     SELECT c.id, c.type, c.title AS name, c.description, c.username,
-           c.is_public, c.created_at,
+           c.is_public, c.created_at, c.owner_id,
            COUNT(cm.user_id)::int AS members,
-           COUNT(*) FILTER (WHERE cm.role IN ('owner','admin'))::int AS admins
+           COUNT(*) FILTER (WHERE cm.role IN ('owner','admin'))::int AS admins,
+           (c.owner_id=$1) AS is_owner
     FROM conversations c
-    JOIN conversation_members cm ON cm.conversation_id = c.id
+    LEFT JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.status='active'
     WHERE c.type IN ('group','channel')
-      AND EXISTS (SELECT 1 FROM conversation_members me WHERE me.conversation_id=c.id AND me.user_id=$1)
+      AND (c.is_public=true OR c.owner_id=$1 OR EXISTS (
+        SELECT 1 FROM conversation_members me
+        WHERE me.conversation_id=c.id AND me.user_id=$1 AND me.status='active'
+      ))
+      AND ($2='' OR c.title ILIKE $3 OR c.username ILIKE $3 OR c.description ILIKE $3)
     GROUP BY c.id
-    ORDER BY c.created_at DESC`, [user.id]);
+    ORDER BY c.created_at DESC
+    LIMIT 100`, [user.id, q, like]);
   return NextResponse.json({ communities: r.rows });
 }
 
