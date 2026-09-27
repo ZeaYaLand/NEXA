@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-function setStatus(text: string, online: boolean) {
+function setStatus(online: boolean) {
   const handle = document.querySelector<HTMLElement>('.chatHandle');
   if (!handle) return;
   handle.dataset.presenceBase ??= handle.textContent || '';
@@ -17,9 +17,8 @@ function setTyping(name: string | null) {
   if (!el) {
     el = document.createElement('div');
     el.dataset.nexaTyping = '1';
-    el.className = 'nexa-typing';
-    const head = chat.querySelector('.chatHead');
-    head?.appendChild(el);
+    el.style.cssText = 'color:#7d8492;font-size:12px;padding:0 0 4px 54px;min-height:18px;';
+    chat.querySelector('.chatHead')?.appendChild(el);
   }
   el.textContent = `✍️ ${name} печатает…`;
 }
@@ -27,27 +26,34 @@ function setTyping(name: string | null) {
 export default function PresenceSync() {
   useEffect(() => {
     let alive = true;
+    let conversation: string | null = null;
     let typingTimer: ReturnType<typeof setTimeout> | undefined;
     let input: HTMLInputElement | null = null;
-    let conversation = new URLSearchParams(window.location.search).get('conversation');
 
-    const heartbeat = () => fetch('/api/presence', { method: 'POST' }).catch(() => {});
+    const originalFetch = window.fetch.bind(window);
+    const trackedFetch: typeof window.fetch = async (...args) => {
+      const requestUrl = typeof args[0] === 'string' ? args[0] : args[0] instanceof Request ? args[0].url : String(args[0]);
+      const match = requestUrl.match(/\/api\/messages\/([^/?]+)/);
+      if (match) conversation = decodeURIComponent(match[1]);
+      return originalFetch(...args);
+    };
+    window.fetch = trackedFetch;
+
+    const heartbeat = () => originalFetch('/api/presence', { method: 'POST' }).catch(() => {});
     heartbeat();
     const heartbeatId = window.setInterval(heartbeat, 20000);
 
     const poll = async () => {
-      if (!alive) return;
-      conversation = new URLSearchParams(window.location.search).get('conversation');
-      if (!conversation) return;
+      if (!alive || !conversation) return;
       try {
         const [p,t] = await Promise.all([
-          fetch(`/api/presence?conversation=${encodeURIComponent(conversation)}`, { cache:'no-store' }),
-          fetch(`/api/typing/${encodeURIComponent(conversation)}`, { cache:'no-store' })
+          originalFetch(`/api/presence?conversation=${encodeURIComponent(conversation)}`, { cache:'no-store' }),
+          originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, { cache:'no-store' })
         ]);
         const presence = await p.json();
         const typing = await t.json();
         const other = (presence.presence || [])[0];
-        if (other) setStatus('', Boolean(other.online));
+        if (other) setStatus(Boolean(other.online));
         const typer = (typing.typing || [])[0];
         setTyping(typer?.displayName || typer?.username || null);
       } catch {}
@@ -59,18 +65,20 @@ export default function PresenceSync() {
       if (!input || input.dataset.nexaPresenceBound) return;
       input.dataset.nexaPresenceBound = '1';
       input.addEventListener('input', () => {
-        const id = new URLSearchParams(window.location.search).get('conversation');
-        if (!id) return;
-        fetch(`/api/typing/${encodeURIComponent(id)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({typing:true}) }).catch(()=>{});
+        if (!conversation) return;
+        originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({typing:true}) }).catch(()=>{});
         if (typingTimer) clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => fetch(`/api/typing/${encodeURIComponent(id)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({typing:false}) }).catch(()=>{}), 2500);
+        typingTimer = setTimeout(() => originalFetch(`/api/typing/${encodeURIComponent(conversation!)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({typing:false}) }).catch(()=>{}), 2500);
       });
     };
     const observer = new MutationObserver(bind);
     observer.observe(document.body, { childList:true, subtree:true });
     bind();
 
-    return () => { alive=false; clearInterval(heartbeatId); clearInterval(pollId); if(typingTimer)clearTimeout(typingTimer); observer.disconnect(); if(input)input.removeAttribute('data-nexa-presence-bound'); };
+    return () => {
+      alive=false; clearInterval(heartbeatId); clearInterval(pollId); if(typingTimer)clearTimeout(typingTimer);
+      observer.disconnect(); if(input)input.removeAttribute('data-nexa-presence-bound'); window.fetch = originalFetch;
+    };
   }, []);
 
   return null;
