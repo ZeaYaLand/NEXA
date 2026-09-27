@@ -9,6 +9,13 @@ function setStatus(online: boolean) {
   handle.textContent = `${handle.dataset.presenceBase} ${online ? '🟢 В сети' : '⚪ Не в сети'}`;
 }
 
+function setProfileStatus(online: boolean) {
+  const el = document.querySelector<HTMLElement>('.profile-username');
+  if (!el) return;
+  el.dataset.presenceBase ??= el.textContent || '';
+  el.textContent = `${el.dataset.presenceBase} · ${online ? '🟢 В сети' : '⚪ Не в сети'}`;
+}
+
 function setTyping(name: string | null) {
   const chat = document.querySelector<HTMLElement>('.chat');
   if (!chat) return;
@@ -44,18 +51,25 @@ export default function PresenceSync() {
     const heartbeatId = window.setInterval(heartbeat, 20000);
 
     const poll = async () => {
-      if (!alive || !conversation) return;
+      if (!alive) return;
       try {
-        const [p,t] = await Promise.all([
-          originalFetch(`/api/presence?conversation=${encodeURIComponent(conversation)}`, { cache:'no-store' }),
-          originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, { cache:'no-store' })
-        ]);
-        const presence = await p.json();
-        const typing = await t.json();
-        const other = (presence.presence || [])[0];
-        if (other) setStatus(Boolean(other.online));
-        const typer = (typing.typing || [])[0];
-        setTyping(typer?.displayName || typer?.username || null);
+        if (conversation) {
+          const [p,t] = await Promise.all([
+            originalFetch(`/api/presence?conversation=${encodeURIComponent(conversation)}`, { cache:'no-store' }),
+            originalFetch(`/api/typing/${encodeURIComponent(conversation)}`, { cache:'no-store' })
+          ]);
+          const presence = await p.json();
+          const typing = await t.json();
+          const other = (presence.presence || [])[0];
+          if (other) setStatus(Boolean(other.online));
+          const typer = (typing.typing || [])[0];
+          setTyping(typer?.displayName || typer?.username || null);
+        }
+        const profileMatch = window.location.pathname.match(/^\/users\/([^/]+)/);
+        if (profileMatch) {
+          const r = await originalFetch(`/api/presence?username=${encodeURIComponent(profileMatch[1])}`, { cache:'no-store' });
+          if (r.ok) { const d = await r.json(); if (d.presence) setProfileStatus(Boolean(d.presence.online)); }
+        }
       } catch {}
     };
     const pollId = window.setInterval(poll, 1500);
