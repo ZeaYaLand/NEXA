@@ -10,7 +10,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}<PresenceSync /></body>
+      <body>
+        {children}
+        <PresenceSync />
+        <style>{`
+          @media (max-width: 760px) {
+            .sidebar nav a { font-size: 0 !important; }
+            .sidebar nav a::before { font-size: 20px !important; }
+            .sidebar nav a::after { font-size: 10px !important; }
+          }
+        `}</style>
+      </body>
     </html>
   );
 }
