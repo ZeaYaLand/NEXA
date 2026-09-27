@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
            c.is_public, c.created_at, c.owner_id,
            COUNT(cm.user_id)::int AS members,
            COUNT(*) FILTER (WHERE cm.role IN ('owner','admin'))::int AS admins,
-           (c.owner_id=$1) AS is_owner
+           (c.owner_id=$1) AS is_owner,
+           EXISTS (SELECT 1 FROM conversation_members me WHERE me.conversation_id=c.id AND me.user_id=$1 AND me.status='active') AS is_member
     FROM conversations c
     LEFT JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.status='active'
     WHERE c.type IN ('group','channel')
