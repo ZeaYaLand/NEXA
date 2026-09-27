@@ -4,22 +4,60 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 type User = { id: string; username: string; email: string };
+type Post = { id: string; content: string; created_at: string; user_id: string; username: string };
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadPosts = async () => {
+    try {
+      const res = await fetch('/api/posts', { cache: 'no-store' });
+      const data = await res.json();
+      setPosts(data.posts ?? []);
+    } catch {
+      setPosts([]);
+    }
+  };
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => setUser(data.user ?? null))
-      .catch(() => setUser(null))
+    Promise.all([
+      fetch('/api/auth/me', { cache: 'no-store' }).then((res) => res.json()),
+      fetch('/api/posts', { cache: 'no-store' }).then((res) => res.json()),
+    ]).then(([me, postData]) => {
+      setUser(me.user ?? null);
+      setPosts(postData.posts ?? []);
+    }).catch(() => setError('Не удалось загрузить ленту'))
       .finally(() => setLoading(false));
   }, []);
 
   const profileHref = user ? '/profile' : '/auth/login';
-  const displayName = user?.username ?? 'N';
   const initial = (user?.username?.[0] ?? 'N').toUpperCase();
+
+  const createPost = async () => {
+    if (!user) return;
+    setError('');
+    setPosting(true);
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Ошибка публикации');
+      setPosts((current) => [data.post, ...current]);
+      setContent('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Ошибка публикации');
+    } finally {
+      setPosting(false);
+    }
+  };
 
   return (
     <main className="shell">
@@ -38,46 +76,39 @@ export default function Home() {
 
       <section className="feed">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">YOUR SPACE</p>
-            <h1>Home</h1>
-          </div>
+          <div><p className="eyebrow">YOUR SPACE</p><h1>Home</h1></div>
           <Link className="avatar" aria-label="Profile" href={profileHref}>{initial}</Link>
         </header>
 
-        <div className="tabs">
-          <button className="selected">For you</button>
-          <button>Following</button>
-        </div>
+        <div className="tabs"><button className="selected">For you</button><button>Following</button></div>
 
-        <article className="composer">
-          <div className="mini-avatar">{initial}</div>
-          <div className="composer-content">
-            <p>What’s happening?</p>
-            <div className="composer-actions">
-              <span>Photo</span><span>Video</span><span>Music</span>
-              <Link href={profileHref}>Post</Link>
+        {user ? (
+          <article className="composer">
+            <div className="mini-avatar">{initial}</div>
+            <div className="composer-content">
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} maxLength={2000} placeholder="What’s happening?" />
+              <div className="composer-actions"><span>{content.length}/2000</span><button onClick={createPost} disabled={posting || !content.trim()}>{posting ? 'Posting…' : 'Post'}</button></div>
             </div>
-          </div>
-        </article>
-
-        <article className="post">
-          <div className="post-head">
-            <div className="mini-avatar gradient">A</div>
-            <div><strong>alex</strong><span>@alex · 2m</span></div>
-            <button className="more" type="button">•••</button>
-          </div>
-          <p className="post-text">NEXA feels different at night.</p>
-          <div className="post-media"><span>MEDIA</span></div>
-          <div className="post-footer"><span>♡ 128</span><span>◌ 24</span><span>↗ Share</span><span>Save</span></div>
-        </article>
-
-        {!loading && !user && (
-          <div className="auth-cta">
-            <Link href="/auth/login">Войти</Link>
-            <Link href="/auth/register">Создать аккаунт</Link>
-          </div>
+          </article>
+        ) : (
+          <article className="composer"><div className="composer-content"><p>Войдите, чтобы публиковать записи.</p><Link href="/auth/login">Войти</Link></div></article>
         )}
+
+        {error && <p className="error">{error}</p>}
+
+        {posts.length === 0 && !loading && <article className="post"><p className="post-text">Пока нет публикаций. Будь первым.</p></article>}
+
+        {posts.map((post) => (
+          <article className="post" key={post.id}>
+            <div className="post-head">
+              <div className="mini-avatar gradient">{post.username[0]?.toUpperCase() ?? 'N'}</div>
+              <div><strong>{post.username}</strong><span>@{post.username} · {new Date(post.created_at).toLocaleString()}</span></div>
+              <button className="more" type="button">•••</button>
+            </div>
+            <p className="post-text">{post.content}</p>
+            <div className="post-footer"><span>♡ 0</span><span>◌ 0</span><span>↗ Share</span><span>Save</span></div>
+          </article>
+        ))}
       </section>
     </main>
   );
