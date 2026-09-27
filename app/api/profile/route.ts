@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { getUser, verifyToken } from '@/lib/auth';
 import { db } from '@/lib/db';
 
+const MAX_AVATAR_DATA_URL = 300_000;
+
 export async function PATCH(request: Request) {
   const token = (await cookies()).get('nexa_session')?.value;
   if (!token) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
@@ -12,7 +14,15 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const displayName = typeof body.displayName === 'string' ? body.displayName.trim().slice(0, 60) : undefined;
     const bio = typeof body.bio === 'string' ? body.bio.trim().slice(0, 160) : undefined;
-    const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim().slice(0, 500) : undefined;
+    const avatarUrl = typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() : undefined;
+
+    if (avatarUrl !== undefined && avatarUrl.length > MAX_AVATAR_DATA_URL) {
+      return NextResponse.json({ error: 'AVATAR_TOO_LARGE' }, { status: 413 });
+    }
+
+    if (avatarUrl && !/^https?:\/\//i.test(avatarUrl) && !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(avatarUrl)) {
+      return NextResponse.json({ error: 'INVALID_AVATAR' }, { status: 400 });
+    }
 
     if (displayName === undefined && bio === undefined && avatarUrl === undefined) {
       return NextResponse.json({ error: 'NOTHING_TO_UPDATE' }, { status: 400 });
