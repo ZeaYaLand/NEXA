@@ -18,10 +18,20 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const conversationId = String(body.conversationId || '');
   const fileName = String(body.fileName || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180);
-  const contentType = String(body.contentType || 'application/octet-stream');
-  const size = Number(body.size || 0);
-  if (!conversationId || !await allowed(conversationId, user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  if (!Number.isFinite(size) || size <= 0 || size > MAX_SIZE) return NextResponse.json({ error: 'Файл слишком большой (максимум 50 МБ)' }, { status: 400 });
+  // Accept both the current client field names and the original API names.
+  const contentType = String(body.mimeType || body.contentType || 'application/octet-stream');
+  const rawSize = body.fileSize ?? body.size;
+  const size = Number(rawSize);
+
+  if (!conversationId || !await allowed(conversationId, user.id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (!Number.isFinite(size) || size <= 0) {
+    return NextResponse.json({ error: 'Не удалось определить размер файла' }, { status: 400 });
+  }
+  if (size > MAX_SIZE) {
+    return NextResponse.json({ error: 'Файл слишком большой (максимум 50 МБ)' }, { status: 400 });
+  }
 
   const mediaType = contentType.startsWith('image/') ? 'image' : contentType.startsWith('video/') ? 'video' : contentType.startsWith('audio/') ? 'audio' : 'file';
   const key = `messages/${conversationId}/${user.id}/${Date.now()}-${crypto.randomUUID()}-${fileName}`;
