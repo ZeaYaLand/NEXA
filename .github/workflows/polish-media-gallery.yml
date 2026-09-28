@@ -20,6 +20,7 @@ jobs:
         run: |
           python3 <<'PY'
           from pathlib import Path
+          import re
 
           page = Path('app/profile/page.tsx')
           css = Path('app/profile/profile.module.css')
@@ -30,143 +31,50 @@ jobs:
               c += r'''
 
 /* NEXA_GALLERY_V2 */
-.mediaGalleryV2 {
-  display:grid !important;
-  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-  gap:12px !important;
-  margin-top:4px;
-}
-.mediaCardV2 {
-  position:relative;
-  overflow:hidden;
-  border:1px solid rgba(255,255,255,.10) !important;
-  border-radius:22px !important;
-  background:linear-gradient(145deg,#10131b,#07080c) !important;
-  box-shadow:0 14px 40px rgba(0,0,0,.24);
-}
-.mediaImageV2 {
-  display:block;
-  width:100%;
-  aspect-ratio:1/1;
-  object-fit:cover;
-  cursor:zoom-in;
-  transition:transform .28s ease,filter .28s ease;
-}
+.mediaGalleryV2 { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:12px !important; margin-top:4px; }
+.mediaCardV2 { position:relative; overflow:hidden; border:1px solid rgba(255,255,255,.10) !important; border-radius:22px !important; background:linear-gradient(145deg,#10131b,#07080c) !important; box-shadow:0 14px 40px rgba(0,0,0,.24); }
+.mediaImageV2 { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; cursor:zoom-in; transition:transform .28s ease,filter .28s ease; }
 .mediaCardV2:hover .mediaImageV2 { transform:scale(1.025); filter:saturate(1.06); }
-.mediaActionsV2 {
-  display:grid !important;
-  grid-template-columns:1fr 1fr 1fr;
-  gap:7px !important;
-  padding:9px !important;
-  background:rgba(8,10,15,.96);
-}
-.mediaActionsV2 button {
-  min-width:0 !important;
-  min-height:38px;
-  padding:7px 5px !important;
-  border:1px solid rgba(255,255,255,.10) !important;
-  border-radius:12px !important;
-  background:#11141c !important;
-  color:#f5f6fa !important;
-  font:600 14px/1 system-ui,sans-serif !important;
-  cursor:pointer;
-  transition:transform .18s ease,border-color .18s ease,background .18s ease;
-}
+.mediaActionsV2 { display:grid !important; grid-template-columns:1fr 1fr 1fr; gap:7px !important; padding:9px !important; background:rgba(8,10,15,.96); }
+.mediaActionsV2 button { min-width:0 !important; min-height:38px; padding:7px 5px !important; border:1px solid rgba(255,255,255,.10) !important; border-radius:12px !important; background:#11141c !important; color:#f5f6fa !important; font:600 14px/1 system-ui,sans-serif !important; cursor:pointer; transition:transform .18s ease,border-color .18s ease,background .18s ease; }
 .mediaActionsV2 button:hover { transform:translateY(-1px); border-color:rgba(145,100,255,.55) !important; background:#171a25 !important; }
 .mediaActionsV2 button.liked { color:#ff4f91 !important; }
-.galleryLightboxV2 {
-  position:fixed;
-  inset:0;
-  z-index:1000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:18px;
-  background:rgba(0,0,0,.84);
-  backdrop-filter:blur(18px);
-}
-.galleryLightboxCardV2 {
-  position:relative;
-  width:min(94vw,900px);
-  max-height:92vh;
-  padding:12px;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:26px;
-  background:#080a0f;
-  box-shadow:0 30px 100px rgba(0,0,0,.55);
-}
-.galleryLightboxImageV2 {
-  display:block;
-  width:100%;
-  max-height:78vh;
-  object-fit:contain;
-  border-radius:18px;
-  background:#020305;
-}
-.galleryLightboxCloseV2 {
-  position:absolute;
-  top:20px;
-  right:20px;
-  z-index:2;
-  width:44px;
-  height:44px;
-  border:1px solid rgba(255,255,255,.16);
-  border-radius:50%;
-  background:rgba(8,10,15,.82);
-  color:#fff;
-  font-size:28px;
-  line-height:1;
-  cursor:pointer;
-}
-.galleryLightboxActionsV2 {
-  display:flex;
-  gap:8px;
-  justify-content:center;
-  padding:10px 4px 2px;
-}
-.galleryLightboxActionsV2 button {
-  border:1px solid rgba(255,255,255,.11);
-  border-radius:13px;
-  padding:10px 15px;
-  background:#11141c;
-  color:#fff;
-  font-weight:700;
-}
-@media (max-width:520px) {
-  .mediaGalleryV2 { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:8px !important; }
-  .mediaActionsV2 { gap:5px !important; padding:7px !important; }
-  .mediaActionsV2 button { min-height:36px; font-size:13px !important; }
-  .galleryLightboxV2 { padding:8px; }
-  .galleryLightboxCardV2 { width:100%; padding:8px; border-radius:20px; }
-}
+.galleryLightboxV2 { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(0,0,0,.84); backdrop-filter:blur(18px); }
+.galleryLightboxCardV2 { position:relative; width:min(94vw,900px); max-height:92vh; padding:12px; border:1px solid rgba(255,255,255,.12); border-radius:26px; background:#080a0f; box-shadow:0 30px 100px rgba(0,0,0,.55); }
+.galleryLightboxImageV2 { display:block; width:100%; max-height:78vh; object-fit:contain; border-radius:18px; background:#020305; }
+.galleryLightboxCloseV2 { position:absolute; top:20px; right:20px; z-index:2; width:44px; height:44px; border:1px solid rgba(255,255,255,.16); border-radius:50%; background:rgba(8,10,15,.82); color:#fff; font-size:28px; line-height:1; cursor:pointer; }
+.galleryLightboxActionsV2 { display:flex; gap:8px; justify-content:center; padding:10px 4px 2px; }
+.galleryLightboxActionsV2 button { border:1px solid rgba(255,255,255,.11); border-radius:13px; padding:10px 15px; background:#11141c; color:#fff; font-weight:700; }
+@media (max-width:520px) { .mediaGalleryV2 { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:8px !important; } .mediaActionsV2 { gap:5px !important; padding:7px !important; } .mediaActionsV2 button { min-height:36px; font-size:13px !important; } .galleryLightboxV2 { padding:8px; } .galleryLightboxCardV2 { width:100%; padding:8px; border-radius:20px; } }
 '''
               css.write_text(c)
 
           if 'NEXA_GALLERY_LIGHTBOX_V2' not in p:
-              marker = " const [comments,setComments]=useState<Record<string,Comment[]>>({}),[openComments,setOpenComments]=useState<Record<string,boolean>>({}),[commentText,setCommentText]=useState<Record<string,string>>({});"
-              replacement = marker + "\n const [lightboxPost,setLightboxPost]=useState<Post|null>(null);"
-              if marker not in p:
+              state_re = r"(const \[comments,setComments=.*?\[commentText,setCommentText\]=useState[^\n]*;)(\n)"
+              p, n = re.subn(state_re, r"\1\n const [lightboxPost,setLightboxPost]=useState<Post|null>(null);\2", p, count=1, flags=re.S)
+              if n != 1:
                   raise SystemExit('profile state marker not found')
-              p = p.replace(marker, replacement, 1)
 
-              share_marker = " async function share(post:Post){const url=`${window.location.origin}/?post=${post.id}`;try{if(navigator.share)await navigator.share({title:`@${user?.username} в NEXA`,text:post.content||'Фото в NEXA',url});else await navigator.clipboard.writeText(url)}catch{}}"
-              share_replacement = share_marker + "\n function openLightbox(post:Post){setLightboxPost(post)}\n function closeLightbox(){setLightboxPost(null)}"
-              if share_marker not in p:
-                  raise SystemExit('share marker not found')
-              p = p.replace(share_marker, share_replacement, 1)
+              share_re = r"(async function share\(post:Post\)\{.*?\n)"
+              p, n = re.subn(share_re, r"\1 function openLightbox(post:Post){setLightboxPost(post)}\n function closeLightbox(){setLightboxPost(null)}\n", p, count=1, flags=re.S)
+              if n != 1:
+                  raise SystemExit('share function marker not found')
 
-              old_gallery = "<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>{visiblePosts.map(post=><div key={post.id} style={{position:'relative',borderRadius:18,overflow:'hidden',background:'#090b10',border:'1px solid #242936'}}><img src={post.media_url||''} alt=\"Фото\" style={{display:'block',width:'100%',aspectRatio:'1/1',objectFit:'cover'}}/><div style={{display:'flex',justifyContent:'space-between',gap:6,padding:8}}><button onClick={()=>like(post)} className={post.liked?'liked':''}>♥ {post.like_count||0}</button><button onClick={()=>toggleComments(post)}>💬 {post.comment_count||0}</button><button onClick={()=>share(post)}>↗"
-              new_gallery = "<div className={styles.mediaGalleryV2}>{visiblePosts.map(post=><div key={post.id} className={styles.mediaCardV2}><img src={post.media_url||''} alt=\"Фото\" className={styles.mediaImageV2} onClick={()=>openLightbox(post)}/><div className={styles.mediaActionsV2}><button onClick={()=>like(post)} className={post.liked?'liked':''}>♥ {post.like_count||0}</button><button onClick={()=>toggleComments(post)}>💬 {post.comment_count||0}</button><button onClick={()=>share(post)}>↗"
-              if old_gallery not in p:
-                  raise SystemExit('gallery marker not found')
-              p = p.replace(old_gallery, new_gallery, 1)
+              replacements = [
+                (r"<div style=\{\{display:'grid',gridTemplateColumns:'repeat\(2,minmax\(0,1fr\)',gap:10\}\}>", "<div className={styles.mediaGalleryV2}>") ,
+                (r"<div key=\{post\.id\} style=\{\{position:'relative',borderRadius:18,overflow:'hidden',background:'#090b10',border:'1px solid #242936'\}\}>", "<div key={post.id} className={styles.mediaCardV2}>") ,
+                (r"<img src=\{post\.media_url\|\|''\} alt=\"Фото\" style=\{\{display:'block',width:'100%',aspectRatio:'1/1',objectFit:'cover'\}\}/>", "<img src={post.media_url||''} alt=\"Фото\" className={styles.mediaImageV2} onClick={()=>openLightbox(post)}/>") ,
+                (r"<div style=\{\{display:'flex',justifyContent:'space-between',gap:6,padding:8\}\}>", "<div className={styles.mediaActionsV2}>")
+              ]
+              for pattern, repl in replacements:
+                  p, n = re.subn(pattern, repl, p, count=1)
+                  if n != 1:
+                      raise SystemExit('gallery markup marker not found: '+pattern)
 
-              insert_before = " {editing&&createPortal("
-              lightbox = """ {lightboxPost&&createPortal(<div className={styles.galleryLightboxV2} role=\"dialog\" aria-modal=\"true\" onMouseDown={e=>{if(e.target===e.currentTarget)closeLightbox()}}><div className={styles.galleryLightboxCardV2}><button type=\"button\" className={styles.galleryLightboxCloseV2} onClick={closeLightbox} aria-label=\"Закрыть\">×</button><img className={styles.galleryLightboxImageV2} src={lightboxPost.media_url||''} alt=\"Фото\"/><div className={styles.galleryLightboxActionsV2}><button type=\"button\" className={lightboxPost.liked?'liked':''} onClick={()=>like(lightboxPost)}>♥ {lightboxPost.like_count||0}</button><button type=\"button\" onClick={()=>toggleComments(lightboxPost)}>💬 {lightboxPost.comment_count||0}</button><button type=\"button\" onClick={()=>share(lightboxPost)}>↗ Поделиться</button></div></div></div>,document.body)}\n"""
-              if insert_before not in p:
-                  raise SystemExit('portal marker not found')
-              p = p.replace(insert_before, lightbox + insert_before, 1)
-
+              lightbox = " {lightboxPost&&createPortal(<div className={styles.galleryLightboxV2} role=\"dialog\" aria-modal=\"true\" onMouseDown={e=>{if(e.target===e.currentTarget)closeLightbox()}}><div className={styles.galleryLightboxCardV2}><button type=\"button\" className={styles.galleryLightboxCloseV2} onClick={closeLightbox} aria-label=\"Закрыть\">×</button><img className={styles.galleryLightboxImageV2} src={lightboxPost.media_url||''} alt=\"Фото\"/><div className={styles.galleryLightboxActionsV2}><button type=\"button\" className={lightboxPost.liked?'liked':''} onClick={()=>like(lightboxPost)}>♥ {lightboxPost.like_count||0}</button><button type=\"button\" onClick={()=>toggleComments(lightboxPost)}>💬 {lightboxPost.comment_count||0}</button><button type=\"button\" onClick={()=>share(lightboxPost)}>↗ Поделиться</button></div></div></div>,document.body)}\n"
+              p, n = re.subn(r"(\{editing&&createPortal\()", lightbox + r"\1", p, count=1)
+              if n != 1:
+                  raise SystemExit('editor portal marker not found')
               page.write_text(p)
 
           PY
