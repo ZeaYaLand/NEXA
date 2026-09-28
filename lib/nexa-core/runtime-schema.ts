@@ -6,6 +6,8 @@ let ready: Promise<void> | null = null;
 export function ensureNexaCoreSchema(): Promise<void> {
   if (ready) return ready;
   ready = db.query(`
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
     CREATE TABLE IF NOT EXISTS nexa_score_snapshots (
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       period TEXT NOT NULL,
