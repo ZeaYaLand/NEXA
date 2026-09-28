@@ -6,16 +6,18 @@ import { ensurePostMediaSchema } from '@/lib/post-media-schema';
 export async function GET() {
   try {
     await ensurePostMediaSchema();
+    const user = await getCurrentUser();
     const result = await db.query(`
       SELECT p.id, p.content, p.created_at, p.media_url, p.media_type,
         u.id AS user_id, u.username,
         (SELECT count(*)::int FROM post_likes l WHERE l.post_id = p.id) AS like_count,
-        (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id) AS comment_count
+        (SELECT count(*)::int FROM comments c WHERE c.post_id = p.id) AS comment_count,
+        ${user ? 'EXISTS (SELECT 1 FROM post_likes l WHERE l.post_id = p.id AND l.user_id = $1)' : 'false'} AS liked
       FROM posts p
       JOIN users u ON u.id = p.user_id
       ORDER BY p.created_at DESC
       LIMIT 50
-    `);
+    `, user ? [user.id] : []);
     return NextResponse.json({ posts: result.rows });
   } catch (error) {
     console.error('GET /api/posts', error);
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
       [user.id, content, mediaUrl || null, mediaType || (mediaUrl ? 'image' : null)]
     );
 
-    return NextResponse.json({ post: { ...result.rows[0], user_id: user.id, username: user.username, like_count: 0, comment_count: 0 } }, { status: 201 });
+    return NextResponse.json({ post: { ...result.rows[0], user_id: user.id, username: user.username, like_count: 0, comment_count: 0, liked: false } }, { status: 201 });
   } catch (error) {
     console.error('POST /api/posts', error);
     return NextResponse.json({ error: 'Failed to create post' }, { status: 500 });
