@@ -10,11 +10,12 @@ const items: Item[] = [
   ['Главная', '/', '⌂'],
   ['Поиск', '/search', '⌕'],
   ['Сообщения', '/messages', '✉'],
-  ['Уведомления', ' /notifications', '♡'],
+  ['Уведомления', '/notifications', '♡'],
   ['Профиль', '/profile', '●'],
   ['Друзья', '/friends', '♧'],
   ['Сообщества', '/communities', '◈'],
   ['Медиа', '/media', '▣'],
+  ['Музыка', '/media?tab=music', '♫'],
   ['Сохранённое', '/bookmarks', '★'],
   ['Настройки', '/settings', '⚙'],
 ];
@@ -62,8 +63,8 @@ export default function MobileMoreMenu() {
             </div>
             <nav className="mobile-main-menu-list">
               {items.map(([label, href, icon]) => (
-                <Link key={href} href={href} className={pathname === href.trim() ? 'is-active' : ''} onClick={() => setOpen(false)}>
-                  <span>{icon}</span><b>{label}</b>{pathname === href.trim() && <small>Открыто</small>}
+                <Link key={href} href={href} className={pathname === href.split('?')[0] ? 'is-active' : ''} onClick={() => setOpen(false)}>
+                  <span>{icon}</span><b>{label}</b>{pathname === href.split('?')[0] && <small>Открыто</small>}
                 </Link>
               ))}
             </nav>
