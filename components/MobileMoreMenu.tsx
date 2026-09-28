@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const items = [
@@ -13,14 +14,18 @@ const items = [
 ] as const;
 
 export default function MobileMoreMenu() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
     window.addEventListener('popstate', close);
     return () => window.removeEventListener('popstate', close);
   }, [open]);
+
+  if (pathname?.startsWith('/auth')) return null;
 
   return (
     <div className="mobile-more-root">
