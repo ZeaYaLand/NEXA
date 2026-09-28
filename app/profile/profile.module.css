@@ -1,0 +1,26 @@
+:global(.profile-stats-grid){display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
+:global(.profile-stat){min-width:0;min-height:86px;padding:14px 12px;border:1px solid #242936;border-radius:16px;background:rgba(9,11,16,.72);color:#f5f7fb;display:flex;flex-direction:column;justify-content:center;text-align:left;overflow:hidden}
+:global(.profile-stat strong){display:block;font-size:20px;line-height:1.1;font-weight:900;overflow-wrap:anywhere}
+:global(.profile-stat span){display:block;margin-top:7px;color:#777e8e;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+:global(button.profile-stat){font:inherit;cursor:pointer;text-align:left;appearance:none}
+:global(button.profile-stat:hover){border-color:#41495c;background:#10131b}
+:global(.profile-stat-button){appearance:none}
+:global(.profile-connections){margin:-4px 0 18px;padding:18px;border:1px solid #242936;border-radius:18px;background:rgba(10,12,17,.78)}
+:global(.profile-connections-head){display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+:global(.profile-connections-head h3){margin:3px 0 0;font-size:18px}
+:global(.profile-connections-close){width:34px;height:34px;border:1px solid #2b3040;border-radius:50%;background:#11141b;color:#fff;font-size:22px;line-height:1;cursor:pointer}
+:global(.profile-people-list){display:grid;gap:7px}
+:global(.profile-person){display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;color:#fff;text-decoration:none;background:#0d1016}
+:global(.profile-person:hover){background:#151923}
+:global(.profile-person .mini-avatar){width:40px;height:40px;overflow:hidden}
+:global(.profile-person .mini-avatar img){width:100%;height:100%;object-fit:cover}
+:global(.profile-person strong),:global(.profile-person small){display:block}
+:global(.profile-person small){margin-top:2px;color:#747b8a}
+
+@media (max-width:760px){
+ :global(.profile-stats-grid){grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px}
+ :global(.profile-stat){min-height:78px;padding:12px 13px;border-radius:14px}
+ :global(.profile-stat strong){font-size:19px}
+ :global(.profile-stat span){font-size:12px;margin-top:5px}
+ :global(.profile-connections){padding:14px;margin-bottom:14px}
+}
