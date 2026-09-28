@@ -16,7 +16,6 @@ export async function GET() {
       FROM posts p
       JOIN users u ON u.id = p.user_id
       ORDER BY p.created_at DESC
-      LIMIT 50
     `, user ? [user.id] : []);
     return NextResponse.json({ posts: result.rows });
   } catch (error) {
