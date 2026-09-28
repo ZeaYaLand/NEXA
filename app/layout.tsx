@@ -17,6 +17,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <MobileMoreMenu />
         <style>{`
           @media (max-width: 760px) {
+            /* The mobile hamburger menu is the only navigation surface. */
+            .app > .sidebar { display: none !important; }
             .sidebar nav a { font-size: 0 !important; }
             .sidebar nav a::before { font-size: 20px !important; }
             .sidebar nav a::after { font-size: 10px !important; }
