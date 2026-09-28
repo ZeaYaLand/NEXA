@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./mobile-fix.css";
 import PresenceSync from "./presence-sync";
 import MobileMoreMenu from "@/components/MobileMoreMenu";
 
