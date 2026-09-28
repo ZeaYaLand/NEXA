@@ -17,11 +17,30 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <MobileMoreMenu />
         <style>{`
           @media (max-width: 760px) {
-            /* The mobile hamburger menu is the only navigation surface. */
-            .app > .sidebar { display: none !important; }
-            .sidebar nav a { font-size: 0 !important; }
-            .sidebar nav a::before { font-size: 20px !important; }
-            .sidebar nav a::after { font-size: 10px !important; }
+            /* Mobile navigation: hamburger menu is the only app navigation. */
+            .app > .sidebar,
+            .shell > .sidebar,
+            body .sidebar {
+              display: none !important;
+              visibility: hidden !important;
+              pointer-events: none !important;
+              height: 0 !important;
+              min-height: 0 !important;
+              max-height: 0 !important;
+              overflow: hidden !important;
+            }
+
+            .shell {
+              display:block !important;
+              grid-template-columns:none !important;
+              width:100% !important;
+              max-width:100% !important;
+              padding-bottom:16px !important;
+            }
+
+            .feed {
+              padding-bottom:24px !important;
+            }
 
             .mobile-main-menu { display:block !important; }
             .mobile-main-menu-trigger {
