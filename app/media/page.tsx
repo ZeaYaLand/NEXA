@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import styles from './media.module.css';
 
 type Story={id:string;username:string;media_url:string;media_type:string;caption:string;created_at:string};
@@ -17,10 +18,13 @@ async function upload(scope:'stories'|'library', file:File){
 }
 
 export default function MediaPage(){
- const [tab,setTab]=useState<'stories'|'video'|'music'>('stories');
+ const params=useSearchParams();
+ const requested=params.get('tab');
+ const [tab,setTab]=useState<'stories'|'video'|'music'>(requested==='video'||requested==='music'?requested:'stories');
  const [stories,setStories]=useState<Story[]>([]),[items,setItems]=useState<Item[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[storyCaption,setStoryCaption]=useState('');
  const [comments,setComments]=useState<Record<string,Comment[]>>({}),[commentText,setCommentText]=useState<Record<string,string>>({}),[openComments,setOpenComments]=useState<Record<string,boolean>>({});
+ useEffect(()=>{if(requested==='video'||requested==='music')setTab(requested)},[requested]);
  const load=async()=>{try{const [s,m]=await Promise.all([fetch('/api/stories',{cache:'no-store'}),fetch('/api/media-library',{cache:'no-store'})]);const sd=await s.json(),md=await m.json();if(!s.ok)throw new Error(sd.error);if(!m.ok)throw new Error(md.error);setStories(sd.stories||[]);setItems(md.items||[])}catch(e){setError(e instanceof Error?e.message:'Ошибка загрузки')}};
  useEffect(()=>{load()},[]);
  const visible=useMemo(()=>items.filter(x=>x.kind===tab),[items,tab]);
