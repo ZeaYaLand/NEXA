@@ -19,6 +19,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <style>{`
           @media (max-width: 760px) {
             /* Mobile navigation: hamburger menu is the only app navigation. */
+            body aside {
+              display: none !important;
+              visibility: hidden !important;
+              pointer-events: none !important;
+            }
+
             .app > .sidebar,
             .shell > .sidebar,
             body .sidebar {
