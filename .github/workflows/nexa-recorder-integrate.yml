@@ -1,0 +1,54 @@
+name: Integrate NEXA message recorder
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nexa-recorder-integrate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Integrate recorder into messages composer
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/messages/page.tsx')
+          s = p.read_text()
+
+          if "@/components/MessageRecorder" not in s:
+              s = s.replace(
+                  "import MessageActions from '@/components/MessageActions';",
+                  "import MessageActions from '@/components/MessageActions';\nimport MessageRecorder from '@/components/MessageRecorder';"
+              )
+
+          if '[recordMode,setRecordMode]' not in s:
+              s = s.replace(
+                  ",[chatSearch,setChatSearch]=useState('');",
+                  ",[chatSearch,setChatSearch]=useState(''),[recordMode,setRecordMode]=useState<'voice'|'circle'>('voice');"
+              )
+
+          marker = " const chooseFile=(file:File|null)=>"
+          if 'const sendRecorded=' not in s and marker in s:
+              fn = """ const sendRecorded=async(blob:Blob,type:'voice'|'circle')=>{if(!selected||uploading)return;setUploading(true);setError('');try{const mimeType=blob.type|| (type==='voice'?'audio/webm':'video/webm');const fileName=type==='voice'?'voice-message.webm':'video-circle.webm';const p=await fetch('/api/media/presign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:selected,fileName,fileSize:blob.size,mimeType})});const pd=await p.json();if(!p.ok)throw Error(pd.error||'Не удалось подготовить загрузку');const up=await fetch(pd.uploadUrl,{method:'PUT',headers:{'Content-Type':mimeType},body:blob});if(!up.ok)throw Error('Не удалось загрузить запись');const r=await fetch(`/api/messages/${selected}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:'',mediaUrl:pd.key,mediaType:type==='voice'?'audio':'video',fileName,fileSize:blob.size,mimeType})});const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось отправить запись');setMessages(x=>[...x,d.message]);setCs(x=>x.map(c=>c.id===selected?{...c,last_message:type==='voice'?'🎙️ Голосовое сообщение':'🔵 Видеокружок',last_message_at:new Date().toISOString()}:c));setRecordMode('voice')}catch(e){setError(e instanceof Error?e.message:'Не удалось отправить запись')}finally{setUploading(false)}};\n"""
+              s = s.replace(marker, fn + marker)
+
+          send_marker = "<button className={styles.send} onClick={send}"
+          if 'MessageRecorder mode={recordMode}' not in s and send_marker in s:
+              controls = "<button type=\"button\" onClick={()=>setRecordMode(x=>x==='voice'?'circle':'voice')} disabled={uploading} title={recordMode==='voice'?'Переключить на видеокружок':'Переключить на голосовое'}>{recordMode==='voice'?'🎙️':'🔵'}</button><MessageRecorder mode={recordMode} onCancel={()=>{}} onRecorded={sendRecorded}/>"
+              s = s.replace(send_marker, controls + send_marker)
+
+          p.write_text(s)
+
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/messages/page.tsx
+          git diff --cached --quiet || git commit -m "Connect voice and video-circle recorder to messages"
+          git push
