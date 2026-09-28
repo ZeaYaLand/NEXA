@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
              EXISTS(SELECT 1 FROM media_likes ml WHERE ml.media_id=m.id AND ml.user_id=$${values.length+1}) AS liked
       FROM media_items m JOIN users u ON u.id=m.user_id
       ${where}
-      ORDER BY m.created_at DESC LIMIT 100
+      ORDER BY m.created_at DESC
     `, [...values, user.id]);
     return NextResponse.json({ items: result.rows.map((m) => ({
       ...m,
