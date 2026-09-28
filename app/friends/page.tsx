@@ -1,0 +1,16 @@
+'use client';
+
+import Link from 'next/link';
+import { useState } from 'react';
+
+type User={id:string;username:string;displayName?:string;avatarUrl?:string|null;followers:number;isFollowing:boolean;isSelf:boolean};
+
+export default function FriendsPage(){
+  const [q,setQ]=useState('');
+  const [users,setUsers]=useState<User[]>([]);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
+  const search=async()=>{const value=q.trim();if(!value){setUsers([]);return}setLoading(true);setError('');try{const r=await fetch(`/api/users/search?q=${encodeURIComponent(value)}`,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка поиска');setUsers(d.users??[])}catch(e){setError(e instanceof Error?e.message:'Не удалось выполнить поиск')}finally{setLoading(false)}};
+  const toggleFollow=async(u:User)=>{try{const r=await fetch(`/api/users/${encodeURIComponent(u.username)}/follow`,{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Ошибка подписки');setUsers(x=>x.map(v=>v.id===u.id?{...v,isFollowing:d.following,followers:d.count}:v))}catch(e){setError(e instanceof Error?e.message:'Не удалось изменить подписку')}};
+  return <main className="shell"><aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Главная</Link><Link href="/search">Поиск</Link><Link href="/messages">Сообщения</Link><Link href="/notifications">Уведомления</Link><Link href="/profile">Профиль</Link><Link className="active" href="/friends">Друзья</Link><Link href="/communities">Сообщества</Link><Link href="/services">Сервисы</Link><Link href="/settings">Настройки</Link></nav></aside><section className="feed"><header className="topbar"><div><p className="eyebrow">NEXA PEOPLE</p><h1>Друзья</h1></div><Link className="avatar" href="/profile">N</Link></header><section className="card"><h2>Найти людей</h2><p>Ищи пользователей по имени или @username и подписывайся на них.</p><div style={{display:'flex',gap:10,marginTop:18}}><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Имя или @username" style={{flex:1,padding:'14px 16px',borderRadius:14,border:'1px solid rgba(255,255,255,.12)',background:'#0d0f15',color:'white',fontSize:16}}/><button onClick={search} disabled={loading} className="button">{loading?'Поиск…':'Найти'}</button></div></section>{error&&<div className="error">{error}</div>}<section style={{display:'grid',gap:12,marginTop:18}}>{users.map(u=><article className="card" key={u.id} style={{display:'flex',alignItems:'center',gap:14}}><div className="avatar" style={{width:52,height:52,flex:'0 0 52px'}}>{u.avatarUrl?<img src={u.avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/>:(u.displayName||u.username)[0]?.toUpperCase()}</div><div style={{flex:1,minWidth:0}}><Link href={`/users/${u.username}`} style={{fontWeight:700,fontSize:18}}>{u.displayName||u.username}</Link><div style={{opacity:.6}}>@{u.username} · {u.followers} подписчиков</div></div>{!u.isSelf&&<button className="button" onClick={()=>toggleFollow(u)}>{u.isFollowing?'Отписаться':'Подписаться'}</button>}</article>)}{!loading&&q.trim()&&users.length===0&&<section className="card"><h3>Никого не найдено</h3><p>Попробуй другое имя или username.</p></section>}</section></section></main>
+}
