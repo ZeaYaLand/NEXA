@@ -18,8 +18,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <MobileMoreMenu />
         <style>{`
           @media (max-width: 760px) {
-            /* Mobile navigation: hamburger menu is the only app navigation. */
-            body aside {
+            /* Hide only the legacy desktop/mobile bottom navigation. Do NOT hide the new mobile menu panel. */
+            body aside:not(.mobile-main-menu-panel) {
               display: none !important;
               visibility: hidden !important;
               pointer-events: none !important;
