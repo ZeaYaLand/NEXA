@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './media.module.css';
 
@@ -20,7 +20,7 @@ async function upload(scope:'stories'|'library',file:File){
  return{key:d.key,mimeType:file.type};
 }
 
-export default function MediaPage(){
+function MediaPageContent(){
  const params=useSearchParams();
  const requested=params.get('tab');
  const [tab,setTab]=useState<'video'|'music'>('video');
@@ -53,4 +53,8 @@ export default function MediaPage(){
  <section className={styles.list}>{visible.map(i=><article className={styles.card} key={i.id}>{i.kind==='video'?<video className={styles.video} src={i.media_url} controls playsInline preload="metadata" poster={i.cover_url||undefined}/>:<div className={styles.music}><div className={styles.cover}>♫</div><div><b>{i.title}</b><span>@{i.username}</span><audio src={i.media_url} controls preload="metadata"/></div></div>}<div className={styles.meta}><div><h3>{i.title}</h3><p>{i.description||'@'+i.username}</p></div><div className={styles.actions}><button className={i.liked?styles.liked:''} onClick={()=>like(i.id)}>♥ {i.like_count}</button><button onClick={()=>toggleComments(i.id)}>💬 {i.comment_count}</button><button onClick={()=>share(i.id)}>↗ Поделиться</button></div></div>{openComments[i.id]&&<div className={styles.comments}>{(comments[i.id]||[]).map(c=><div key={c.id}><b>@{c.username}</b><span>{c.content}</span></div>)}<div className={styles.commentForm}><input value={commentText[i.id]||''} onChange={e=>setCommentText(x=>({...x,[i.id]:e.target.value}))} placeholder="Комментарий…" maxLength={1000}/><button onClick={()=>addComment(i.id)}>Отправить</button></div></div>}</article>)}{visible.length===0&&<div className={styles.empty}>Здесь пока ничего нет. Загрузи первый файл выше.</div>}</section>
  {selectedStory&&<div className={styles.viewerBackdrop} onMouseDown={e=>e.target===e.currentTarget&&setSelectedStory(null)}><section className={styles.viewer}><div className={styles.viewerTop}><div><b>@{selectedStory.username}</b><span>{selectedStory.view_count} просмотров</span></div><div className={styles.viewerButtons}><button onClick={()=>shareStory(selectedStory)}>↗</button><button onClick={()=>setSelectedStory(null)}>×</button></div></div><div className={styles.viewerMedia}>{selectedStory.media_type==='video'?<video src={selectedStory.media_url} controls autoPlay playsInline/>:<img src={selectedStory.media_url} alt={selectedStory.caption||'История'}/>}</div>{selectedStory.caption&&<p className={styles.viewerCaption}>{selectedStory.caption}</p>}</section></div>}
  </section></main>;
+}
+
+export default function MediaPage(){
+ return <Suspense fallback={<main className="shell"><section className="feed"><div style={{padding:'32px'}}>Загрузка медиа…</div></section></main>}><MediaPageContent/></Suspense>;
 }
