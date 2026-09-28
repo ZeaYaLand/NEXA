@@ -35,6 +35,7 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     return () => {
@@ -49,14 +50,16 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
     return () => window.clearInterval(timer);
   }, [recording]);
 
-  const fail = (error: unknown) => {
-    const message = friendlyError(error, mode);
+  const fail = (reason: unknown) => {
+    const message = friendlyError(reason, mode);
+    setError(message);
     onError?.(message);
     onCancel();
   };
 
   const start = async () => {
     if (recording || busy) return;
+    setError('');
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('MediaDevices API is unavailable');
       if (typeof MediaRecorder === 'undefined') throw new Error('MediaRecorder is unavailable');
@@ -83,7 +86,9 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
         recorderRef.current = null;
         setRecording(false);
         setSeconds(0);
-        onError?.(mode === 'voice' ? 'Ошибка записи голосового сообщения.' : 'Ошибка записи видеокружка.');
+        const message = mode === 'voice' ? 'Ошибка записи голосового сообщения.' : 'Ошибка записи видеокружка.';
+        setError(message);
+        onError?.(message);
       };
 
       recorder.onstop = async () => {
@@ -94,14 +99,17 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
         if (!blob.size) {
           setRecording(false);
           setSeconds(0);
-          onError?.('Запись получилась пустой. Попробуй записать ещё раз.');
+          const message = 'Запись получилась пустой. Попробуй записать ещё раз.';
+          setError(message);
+          onError?.(message);
           return;
         }
         setBusy(true);
         try {
           await onRecorded(blob, mode);
-        } catch (error) {
-          fail(error);
+          setError('');
+        } catch (reason) {
+          fail(reason);
         } finally {
           setBusy(false);
         }
@@ -111,10 +119,10 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
       recorder.start(250);
       setSeconds(0);
       setRecording(true);
-    } catch (error) {
+    } catch (reason) {
       streamRef.current?.getTracks().forEach(track => track.stop());
       streamRef.current = null;
-      fail(error);
+      fail(reason);
     }
   };
 
@@ -156,7 +164,7 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, minWidth: 0 }}>
       {recording ? (
         <>
           <span aria-label="Идёт запись" style={{ color: '#ff557d', fontWeight: 800, whiteSpace: 'nowrap' }}>● {format}</span>
@@ -168,6 +176,7 @@ export default function MessageRecorder({ mode, onCancel, onRecorded, onError }:
           {mode === 'voice' ? '🎙️ Записать' : '🔵 Записать'}
         </button>
       )}
+      {error && <span role="alert" style={{ color: '#ff668e', fontSize: 11, maxWidth: 210 }}>{error}</span>}
     </div>
   );
 }
