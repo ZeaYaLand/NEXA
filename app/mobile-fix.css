@@ -1,29 +1,40 @@
-/* NEXA mobile navigation: the hamburger menu is the only navigation surface. */
+/* NEXA mobile navigation — ONE navigation surface only. */
 @media (max-width: 760px) {
   html, body { overflow-x: hidden !important; }
+
+  /* The desktop sidebar must NEVER become a bottom navigation bar on mobile. */
   body .sidebar,
   body .app > .sidebar,
-  body .shell > .sidebar {
+  body .shell > .sidebar,
+  body .sidebar nav,
+  body .sidebar nav a,
+  body .mobile-more-root,
+  body .mobile-more-trigger,
+  body .mobile-more-backdrop,
+  body .mobile-more-panel {
     display: none !important;
     visibility: hidden !important;
-    position: absolute !important;
-    width: 0 !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: 0 !important;
-    overflow: hidden !important;
     pointer-events: none !important;
   }
 
+  /* Remove the space reserved for the old bottom bar. */
   body .app,
-  body .shell {
-    padding-bottom: 24px !important;
-  }
+  body .shell,
+  body .feed { padding-bottom: 24px !important; }
 
-  body .feed {
-    padding-bottom: 24px !important;
+  /* The only mobile navigation is the hamburger menu. */
+  body .mobile-main-menu {
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
   }
+  body .mobile-main-menu-trigger {
+    display: flex !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+}
+
+@media (min-width: 761px) {
+  body .mobile-main-menu { display: none !important; }
 }
