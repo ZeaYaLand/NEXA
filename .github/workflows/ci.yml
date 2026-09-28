@@ -27,42 +27,40 @@ jobs:
         run: |
           python3 <<'PY'
           from pathlib import Path
-          page=Path('app/profile/page.tsx'); css=Path('app/profile/profile.module.css')
-          p=page.read_text(); c=css.read_text(); changed=False
-          if 'NEXA_GALLERY_V2' not in c:
-            c += '''\n/* NEXA_GALLERY_V2 */\n.mediaGalleryV2{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:12px !important;margin-top:4px}.mediaCardV2{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.1) !important;border-radius:22px !important;background:linear-gradient(145deg,#10131b,#07080c) !important;box-shadow:0 14px 40px rgba(0,0,0,.24)}.mediaImageV2{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;cursor:zoom-in;transition:transform .28s ease,filter .28s ease}.mediaCardV2:hover .mediaImageV2{transform:scale(1.025);filter:saturate(1.06)}.mediaActionsV2{display:grid !important;grid-template-columns:1fr 1fr 1fr;gap:7px !important;padding:9px !important;background:rgba(8,10,15,.96)}.mediaActionsV2 button{min-width:0 !important;min-height:38px;padding:7px 5px !important;border:1px solid rgba(255,255,255,.1) !important;border-radius:12px !important;background:#11141c !important;color:#f5f6fa !important;font:600 14px/1 system-ui,sans-serif !important;cursor:pointer}.mediaActionsV2 button:hover{border-color:rgba(145,100,255,.55) !important;background:#171a25 !important}.mediaActionsV2 button.liked{color:#ff4f91 !important}.galleryLightboxV2{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.84);backdrop-filter:blur(18px)}.galleryLightboxCardV2{position:relative;width:min(94vw,900px);max-height:92vh;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:26px;background:#080a0f;box-shadow:0 30px 100px rgba(0,0,0,.55)}.galleryLightboxImageV2{display:block;width:100%;max-height:78vh;object-fit:contain;border-radius:18px;background:#020305}.galleryLightboxCloseV2{position:absolute;top:20px;right:20px;z-index:2;width:44px;height:44px;border:1px solid rgba(255,255,255,.16);border-radius:50%;background:rgba(8,10,15,.82);color:#fff;font-size:28px;line-height:1;cursor:pointer}.galleryLightboxActionsV2{display:flex;gap:8px;justify-content:center;padding:10px 4px 2px}.galleryLightboxActionsV2 button{border:1px solid rgba(255,255,255,.11);border-radius:13px;padding:10px 15px;background:#11141c;color:#fff;font-weight:700}@media(max-width:520px){.mediaGalleryV2{gap:8px !important}.mediaActionsV2{gap:5px !important;padding:7px !important}.mediaActionsV2 button{min-height:36px;font-size:13px !important}.galleryLightboxV2{padding:8px}.galleryLightboxCardV2{width:100%;padding:8px;border-radius:20px}}\n'''
-            changed=True
-          # Repair an earlier partial patch if it exists.
-          bad=' {NEXA_GALLERY_LIGHTBOX_V2&&lightboxPost&&createPortal'
-          if bad in p:
-            p=p.replace(bad,' {lightboxPost&&createPortal',1); changed=True
-          state="const [lightboxPost,setLightboxPost]=useState<Post|null>(null);"
-          if state not in p:
-            marker="const [comments,setComments]=useState<Record<string,Comment[]>>({}),[openComments,setOpenComments]=useState<Record<string,boolean>>({}),[commentText,setCommentText]=useState<Record<string,string>>({});"
-            if marker not in p: raise SystemExit('gallery patch: state marker not found')
-            p=p.replace(marker,marker+'\n '+state,1); changed=True
-          share=" function openLightbox(post:Post){setLightboxPost(post)}"
-          if share not in p:
-            marker=" async function share(post:Post){const url=`${window.location.origin}/?post=${post.id}`;try{if(navigator.share)await navigator.share({title:`@${user?.username} в NEXA`,text:post.content||'Фото в NEXA',url});else await navigator.clipboard.writeText(url)}catch{}}"
-            if marker not in p: raise SystemExit('gallery patch: share marker not found')
-            p=p.replace(marker,marker+'\n'+share+'\n function closeLightbox(){setLightboxPost(null)}',1); changed=True
-          pairs=[
-            ("<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>","<div className={styles.mediaGalleryV2}>"),
-            ("<div key={post.id} style={{position:'relative',borderRadius:18,overflow:'hidden',background:'#090b10',border:'1px solid #242936'}}>","<div key={post.id} className={styles.mediaCardV2}>"),
-            ("<img src={post.media_url||''} alt=\"Фото\" style={{display:'block',width:'100%',aspectRatio:'1/1',objectFit:'cover'}}/>","<img src={post.media_url||''} alt=\"Фото\" className={styles.mediaImageV2} onClick={()=>openLightbox(post)}/>") ,
-            ("<div style={{display:'flex',justifyContent:'space-between',gap:6,padding:8}}>","<div className={styles.mediaActionsV2}>")]
-          for old,new in pairs:
-            if old in p: p=p.replace(old,new,1); changed=True
-          if 'galleryLightboxV2' not in p:
-            marker=' {editing&&createPortal('
-            if marker not in p: raise SystemExit('gallery patch: editor marker not found')
-            portal=" {lightboxPost&&createPortal(<div className={styles.galleryLightboxV2} role=\"dialog\" aria-modal=\"true\" onMouseDown={e=>{if(e.target===e.currentTarget)closeLightbox()}}><div className={styles.galleryLightboxCardV2}><button type=\"button\" className={styles.galleryLightboxCloseV2} onClick={closeLightbox} aria-label=\"Закрыть\">×</button><img className={styles.galleryLightboxImageV2} src={lightboxPost.media_url||''} alt=\"Фото\"/><div className={styles.galleryLightboxActionsV2}><button type=\"button\" className={lightboxPost.liked?'liked':''} onClick={()=>like(lightboxPost)}>♥ {lightboxPost.like_count||0}</button><button type=\"button\" onClick={()=>toggleComments(lightboxPost)}>💬 {lightboxPost.comment_count||0}</button><button type=\"button\" onClick={()=>share(lightboxPost)}>↗ Поделиться</button></div></div></div>,document.body)}\n"
-            p=p.replace(marker,portal+marker,1); changed=True
+          page = Path('app/profile/page.tsx')
+          css = Path('app/profile/profile.module.css')
+          p = page.read_text()
+          c = css.read_text()
+          changed = False
+
+          if 'NEXA_GALLERY_V3' not in c:
+              c += '''\n/* NEXA_GALLERY_V3 */\n.mediaGalleryV3{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:12px !important;margin-top:4px}.mediaCardV3{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.1) !important;border-radius:22px !important;background:linear-gradient(145deg,#10131b,#07080c) !important;box-shadow:0 14px 40px rgba(0,0,0,.24)}.mediaImageV3{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;cursor:zoom-in;transition:transform .28s ease,filter .28s ease}.mediaCardV3:hover .mediaImageV3{transform:scale(1.025);filter:saturate(1.06)}.mediaActionsV3{display:grid !important;grid-template-columns:1fr 1fr 1fr;gap:7px !important;padding:9px !important;background:rgba(8,10,15,.96)}.mediaActionsV3 button{min-width:0 !important;min-height:38px;padding:7px 5px !important;border:1px solid rgba(255,255,255,.1) !important;border-radius:12px !important;background:#11141c !important;color:#f5f6fa !important;font:600 14px/1 system-ui,sans-serif !important;cursor:pointer}.mediaActionsV3 button:hover{border-color:rgba(145,100,255,.55) !important;background:#171a25 !important}.mediaActionsV3 button.liked{color:#ff4f91 !important}@media(max-width:520px){.mediaGalleryV3{gap:8px !important}.mediaActionsV3{gap:5px !important;padding:7px !important}.mediaActionsV3 button{min-height:36px;font-size:13px !important}}\n'''
+              changed = True
+
+          replacements = [
+              ("<div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10}}>", "<div className={styles.mediaGalleryV3}>") ,
+              ("<div key={post.id} style={{position:'relative',borderRadius:18,overflow:'hidden',background:'#090b10',border:'1px solid #242936'}}>", "<div key={post.id} className={styles.mediaCardV3}>") ,
+              ("<img src={post.media_url||''} alt=\"Фото\" style={{display:'block',width:'100%',aspectRatio:'1/1',objectFit:'cover'}}/>", "<img src={post.media_url||''} alt=\"Фото\" className={styles.mediaImageV3} onClick={()=>window.open(post.media_url||'', '_blank')}/>") ,
+              ("<div style={{display:'flex',justifyContent:'space-between',gap:6,padding:8}}>", "<div className={styles.mediaActionsV3}>")
+          ]
+          for old, new in replacements:
+              if old in p:
+                  p = p.replace(old, new, 1)
+                  changed = True
+
           if changed:
-            page.write_text(p); css.write_text(c)
-          else: print('Gallery already patched')
+              page.write_text(p)
+              css.write_text(c)
           PY
-          if git diff --quiet; then echo "No gallery commit needed"; else git config user.name "NEXA Automation"; git config user.email "actions@nexa.local"; git add app/profile/page.tsx app/profile/profile.module.css; git commit -m "Polish NEXA media gallery and photo viewer"; git push; fi
+          if git diff --quiet; then
+            echo "No gallery changes needed"
+          else
+            git config user.name "NEXA Automation"
+            git config user.email "actions@nexa.local"
+            git add app/profile/page.tsx app/profile/profile.module.css
+            git commit -m "Polish NEXA media gallery"
+            git push
+          fi
       - name: Install dependencies
         run: npm install
       - name: TypeScript check
