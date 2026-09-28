@@ -20,9 +20,9 @@ function jsonError(error: string, status: number) { return NextResponse.json({ e
 
 function parseKey(key: string) {
   const message = key.match(/^messages\/([^/]+)\/([^/]+)\/[^/]+$/);
-  if (message) return { scope: 'message', conversationId: message[1] };
+  if (message) return { scope: 'message' as const, conversationId: message[1] as string };
   const social = key.match(/^(stories|library)\/([^/]+)\/[^/]+$/);
-  if (social) return { scope: social[1], ownerId: social[2] };
+  if (social) return { scope: social[1] as 'stories'|'library', ownerId: social[2] as string };
   return null;
 }
 
