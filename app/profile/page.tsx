@@ -3,6 +3,7 @@
 import styles from './profile.module.css';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 
 type User = { id:string; username:string; email:string; displayName:string; bio:string; avatarUrl:string|null; createdAt:string };
@@ -38,6 +39,9 @@ export default function ProfilePage(){
  const joined=new Date(user.createdAt);
  const joinedLabel=Number.isNaN(joined.getTime())?'Недавно':joined.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
  const connectionPeople=connections==='followers'?followers:following;
+ const connectionsModal=connections && <div className={styles.profileConnectionsBackdrop} role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setConnections(null)}}><section className={styles.profileConnections} role="dialog" aria-modal="true" aria-labelledby="connections-title"><div className={styles.profileConnectionsHead}><div><p className="eyebrow">NEXA NETWORK</p><h3 id="connections-title">{connections==='followers'?'Твои подписчики':'Твои подписки'}</h3></div><button type="button" className={styles.profileConnectionsClose} aria-label="Закрыть" onClick={()=>setConnections(null)}>×</button></div>
+    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className={styles.profilePeopleList}>{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className={styles.profilePerson}><span className="mini-avatar gradient">{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span><span><strong>{person.displayName||person.username}</strong><small>@{person.username}</small></span></Link>)}</div>}
+   </section></div>;
 
  return <main className="shell">
   <aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Home</Link><Link href="/search">Search</Link><Link href="/messages">Messages</Link><Link href="/notifications">Notifications</Link><Link className="active" href="/profile">Profile</Link><Link href="/settings">Settings</Link></nav></aside>
@@ -55,14 +59,11 @@ export default function ProfilePage(){
     </div>
    </div></section>
 
-   {connections && <div className={styles.profileConnectionsBackdrop} role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setConnections(null)}}><section className={styles.profileConnections} role="dialog" aria-modal="true" aria-labelledby="connections-title"><div className={styles.profileConnectionsHead}><div><p className="eyebrow">NEXA NETWORK</p><h3 id="connections-title">{connections==='followers'?'Твои подписчики':'Твои подписки'}</h3></div><button type="button" className={styles.profileConnectionsClose} aria-label="Закрыть" onClick={()=>setConnections(null)}>×</button></div>
-    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className={styles.profilePeopleList}>{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className={styles.profilePerson}><span className="mini-avatar gradient">{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span><span><strong>{person.displayName||person.username}</strong><small>@{person.username}</small></span></Link>)}</div>}
-   </section></div>}
-
    <div className="profile-tabs"><button className="selected">Посты <span style={{opacity:.6}}>· {posts.length}</span></button><button disabled>Медиа</button><button disabled>Лайки</button></div>
    <section>{postsLoading?<div className="profile-empty"><h3>Загружаем публикации…</h3></div>:posts.length===0?<div className="profile-empty"><div className="profile-empty-icon">✦</div><h3>Твоё пространство</h3><p>Создай первую публикацию — она появится здесь.</p><Link href="/" style={{display:'inline-block',marginTop:16,color:'#fff',textDecoration:'none',fontWeight:800}}>Создать пост →</Link></div>:posts.map(post=><article className="post" key={post.id}><div className="post-head"><div className="mini-avatar gradient">{initial}</div><div><strong>{user.displayName||user.username}</strong><span>@{user.username} · {new Date(post.created_at).toLocaleDateString('ru-RU')}</span></div></div><p className="post-text">{post.content}</p><div className="post-footer"><span>Публикация</span><span>{new Date(post.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span></div></article>)}</section>
   </section>
 
   {editing&&<div className="profile-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditing(false)}}><form className="profile-modal" onSubmit={save}><div className="profile-modal-head"><div><p className="eyebrow">NEXA PROFILE</p><h2>Редактировать профиль</h2></div><button type="button" className="modal-close" onClick={()=>setEditing(false)}>×</button></div><div className="avatar-editor"><div className="profile-avatar gradient avatar-editor-preview">{form.avatarUrl?<img src={form.avatarUrl} alt="Предпросмотр"/>:initial}</div><button type="button" className="profile-action secondary" onClick={()=>fileInputRef.current?.click()}>Выбрать фото</button><input ref={fileInputRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseAvatar}/></div><label>Имя<input value={form.displayName} maxLength={60} onChange={e=>setForm({...form,displayName:e.target.value})}/></label><label>О себе<textarea value={form.bio} maxLength={160} rows={4} onChange={e=>setForm({...form,bio:e.target.value})}/></label>{error&&<p className="profile-form-error">{error}</p>}<div className="profile-modal-actions"><button type="button" className="profile-action secondary" onClick={()=>setEditing(false)}>Отмена</button><button className="profile-action primary" disabled={saving}>{saving?'Сохраняем…':'Сохранить'}</button></div></form></div>}
+  {typeof document!=='undefined' && connectionsModal ? createPortal(connectionsModal,document.body) : null}
  </main>
 }
