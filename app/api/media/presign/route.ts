@@ -5,33 +5,25 @@ import { db } from '@/lib/db';
 const FUNCTION_URL = process.env.NEON_MEDIA_FUNCTION_URL;
 const MAX_SIZE = 50 * 1024 * 1024;
 
-async function allowed(conversationId: string, userId: string) {
-  const r = await db.query(
-    'SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2',
-    [conversationId, userId]
-  );
+async function allowedConversation(conversationId: string, userId: string) {
+  const r = await db.query('SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2', [conversationId, userId]);
   return !!r.rowCount;
 }
 
 async function readJsonResponse(response: Response) {
   const text = await response.text();
   if (!text.trim()) return null;
-
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(text) as Record<string, unknown>; } catch { return null; }
 }
 
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status });
-}
+function jsonError(error: string, status: number) { return NextResponse.json({ error }, { status }); }
 
-function parseMediaKey(key: string) {
-  const match = key.match(/^messages\/([^/]+)\/([^/]+)\/[^/]+$/);
-  if (!match) return null;
-  return { conversationId: match[1], senderId: match[2] };
+function parseKey(key: string) {
+  const message = key.match(/^messages\/([^/]+)\/([^/]+)\/[^/]+$/);
+  if (message) return { scope: 'message', conversationId: message[1] };
+  const social = key.match(/^(stories|library)\/([^/]+)\/[^/]+$/);
+  if (social) return { scope: social[1], ownerId: social[2] };
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -39,75 +31,42 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) return jsonError('Unauthorized', 401);
     if (!FUNCTION_URL) return jsonError('Media storage is not configured', 503);
-
     let body: Record<string, unknown>;
-    try {
-      body = await req.json();
-    } catch {
-      return jsonError('Некорректные данные запроса', 400);
-    }
+    try { body = await req.json(); } catch { return jsonError('Некорректные данные запроса', 400); }
 
     const conversationId = String(body.conversationId || '');
-    const fileName = String(body.fileName || 'file')
-      .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .slice(0, 180);
+    const scope = String(body.scope || (conversationId ? 'message' : ''));
+    const fileName = String(body.fileName || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180);
     const contentType = String(body.mimeType || body.contentType || 'application/octet-stream');
     const size = Number(body.fileSize ?? body.size);
 
-    if (!conversationId || !(await allowed(conversationId, user.id))) {
-      return jsonError('Forbidden', 403);
-    }
+    if (!['message', 'stories', 'library'].includes(scope)) return jsonError('Некорректная область хранения', 400);
+    if (scope === 'message' && (!conversationId || !(await allowedConversation(conversationId, user.id)))) return jsonError('Forbidden', 403);
+    if (!Number.isFinite(size) || size <= 0) return jsonError('Не удалось определить размер файла', 400);
+    if (size > MAX_SIZE) return jsonError('Файл слишком большой (максимум 50 МБ)', 400);
 
-    if (!Number.isFinite(size) || size <= 0) {
-      return jsonError('Не удалось определить размер файла', 400);
-    }
-
-    if (size > MAX_SIZE) {
-      return jsonError('Файл слишком большой (максимум 50 МБ)', 400);
-    }
-
-    const mediaType = contentType.startsWith('image/')
-      ? 'image'
-      : contentType.startsWith('video/')
-        ? 'video'
-        : contentType.startsWith('audio/')
-          ? 'audio'
-          : 'file';
-
-    const key = `messages/${conversationId}/${user.id}/${Date.now()}-${crypto.randomUUID()}-${fileName}`;
+    const mediaType = contentType.startsWith('image/') ? 'image' : contentType.startsWith('video/') ? 'video' : contentType.startsWith('audio/') ? 'audio' : 'file';
+    const key = scope === 'message'
+      ? `messages/${conversationId}/${user.id}/${Date.now()}-${crypto.randomUUID()}-${fileName}`
+      : `${scope}/${user.id}/${Date.now()}-${crypto.randomUUID()}-${fileName}`;
 
     let response: Response;
     try {
       response = await fetch(`${FUNCTION_URL.replace(/\/$/, '')}/presign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operation: 'upload', key, contentType }),
       });
     } catch (error) {
       console.error('Media upload presign fetch failed:', error);
       return jsonError('Не удалось связаться с хранилищем', 502);
     }
-
     const data = await readJsonResponse(response);
-
     if (!response.ok) {
       const message = typeof data?.error === 'string' ? data.error : `Ошибка хранилища (${response.status})`;
       return jsonError(message, 502);
     }
-
-    if (!data || typeof data.url !== 'string' || !data.url) {
-      console.error('Invalid upload presign response:', { status: response.status, data });
-      return jsonError('Хранилище не вернуло URL загрузки', 502);
-    }
-
-    return NextResponse.json({
-      uploadUrl: data.url,
-      key,
-      mediaType,
-      fileName,
-      fileSize: size,
-      mimeType: contentType,
-    });
+    if (!data || typeof data.url !== 'string' || !data.url) return jsonError('Хранилище не вернуло URL загрузки', 502);
+    return NextResponse.json({ uploadUrl: data.url, key, mediaType, fileName, fileSize: size, mimeType: contentType });
   } catch (error) {
     console.error('POST /api/media/presign error:', error);
     return jsonError('Ошибка при подготовке загрузки файла', 500);
@@ -119,44 +78,27 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) return jsonError('Unauthorized', 401);
     if (!FUNCTION_URL) return jsonError('Media storage is not configured', 503);
-
     const key = new URL(req.url).searchParams.get('key') || '';
-    const parsed = parseMediaKey(key);
-
+    const parsed = parseKey(key);
     if (!parsed) return jsonError('Некорректный media key', 400);
-
-    // The file is owned by the sender, but the recipient must also be able
-    // to view it. Authorize by conversation membership instead of requiring
-    // the current user's id to be present in the storage key.
-    if (!(await allowed(parsed.conversationId, user.id))) {
-      return jsonError('Forbidden', 403);
-    }
+    if (parsed.scope === 'message' && !(await allowedConversation(parsed.conversationId, user.id))) return jsonError('Forbidden', 403);
 
     let response: Response;
     try {
       response = await fetch(`${FUNCTION_URL.replace(/\/$/, '')}/presign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operation: 'download', key }),
       });
     } catch (error) {
       console.error('Media download presign fetch failed:', error);
       return jsonError('Не удалось связаться с хранилищем', 502);
     }
-
     const data = await readJsonResponse(response);
-
     if (!response.ok) {
       const message = typeof data?.error === 'string' ? data.error : `Ошибка хранилища (${response.status})`;
-      console.error('Media download presign returned error:', response.status, data);
       return jsonError(message, 502);
     }
-
-    if (!data || typeof data.url !== 'string' || !data.url) {
-      console.error('Invalid download presign response:', { status: response.status, data });
-      return jsonError('Хранилище не вернуло URL файла', 502);
-    }
-
+    if (!data || typeof data.url !== 'string' || !data.url) return jsonError('Хранилище не вернуло URL файла', 502);
     return NextResponse.redirect(data.url);
   } catch (error) {
     console.error('GET /api/media/presign error:', error);
