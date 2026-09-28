@@ -18,10 +18,7 @@ export type NexaRankRow = {
   crownEligible: boolean;
 };
 
-/**
- * NEXA Pulse is intentionally multi-signal: one viral post cannot dominate the table.
- * The balance multiplier rewards creators who generate more than one kind of activity.
- */
+/** NEXA Pulse rewards several kinds of activity so one viral post cannot dominate. */
 export async function calculateNexaRanking(limit = 50): Promise<NexaRankRow[]> {
   await ensureNexaCoreSchema();
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
@@ -33,28 +30,19 @@ export async function calculateNexaRanking(limit = 50): Promise<NexaRankRow[]> {
         u.display_name,
         u.avatar_url,
         COUNT(DISTINCT p.id)::int AS posts_7d,
-        COALESCE((SELECT COUNT(*)::int FROM post_likes pl JOIN posts lp ON lp.id = pl.post_id WHERE lp.user_id = u.id AND pl.created_at >= NOW() - INTERVAL '7 days'), 0) AS likes_7d,
+        COALESCE((SELECT COUNT(*)::int FROM post_likes pl JOIN posts lp ON lp.id = pl.post_id WHERE lp.user_id = u.id AND lp.post_id IN (SELECT id FROM posts WHERE user_id = u.id AND created_at >= NOW() - INTERVAL '7 days')), 0) AS likes_7d,
         COALESCE((SELECT COUNT(*)::int FROM comments cc JOIN posts cp ON cp.id = cc.post_id WHERE cp.user_id = u.id AND cc.created_at >= NOW() - INTERVAL '7 days'), 0) AS comments_7d,
         COALESCE((SELECT COUNT(*)::int FROM follows f WHERE f.following_id = u.id), 0) AS followers,
-        COALESCE((SELECT COUNT(DISTINCT cc.author_id)::int FROM comments cc JOIN posts cp ON cp.id = cc.post_id WHERE cp.user_id = u.id AND cc.created_at >= NOW() - INTERVAL '7 days'), 0) AS unique_commenters_7d
+        COALESCE((SELECT COUNT(DISTINCT cc.user_id)::int FROM comments cc JOIN posts cp ON cp.id = cc.post_id WHERE cp.user_id = u.id AND cc.created_at >= NOW() - INTERVAL '7 days'), 0) AS unique_commenters_7d
       FROM users u
       LEFT JOIN posts p ON p.user_id = u.id AND p.created_at >= NOW() - INTERVAL '7 days'
       GROUP BY u.id, u.username, u.display_name, u.avatar_url
     ), scored AS (
       SELECT *,
-        CASE
-          WHEN GREATEST(likes_7d, comments_7d) = 0 THEN 0
+        CASE WHEN GREATEST(likes_7d, comments_7d) = 0 THEN 0
           ELSE LEAST(1, LEAST(likes_7d, comments_7d)::numeric / GREATEST(likes_7d, comments_7d)::numeric)
         END AS balance,
-        (
-          posts_7d * 4.0 +
-          likes_7d * 1.4 +
-          comments_7d * 2.6 +
-          followers * 0.8 +
-          unique_commenters_7d * 3.0 +
-          LEAST(posts_7d, 14) * 3.0 +
-          LEAST(40, SQRT((likes_7d + comments_7d)::numeric) * 5.0)
-        ) AS raw_score
+        (posts_7d * 4.0 + likes_7d * 1.4 + comments_7d * 2.6 + followers * 0.8 + unique_commenters_7d * 3.0 + LEAST(posts_7d, 14) * 3.0 + LEAST(40, SQRT((likes_7d + comments_7d)::numeric) * 5.0)) AS raw_score
       FROM activity
     )
     SELECT *,
@@ -66,20 +54,11 @@ export async function calculateNexaRanking(limit = 50): Promise<NexaRankRow[]> {
   `, [safeLimit]);
 
   const rows = result.rows.map((r: any) => ({
-    rank: Number(r.rank),
-    userId: String(r.user_id),
-    username: r.username,
-    displayName: r.display_name,
-    avatarUrl: r.avatar_url,
-    score: Number(r.score),
-    posts7d: Number(r.posts_7d),
-    likes7d: Number(r.likes_7d),
-    comments7d: Number(r.comments_7d),
-    followers: Number(r.followers),
-    uniqueCommenters7d: Number(r.unique_commenters_7d),
-    balance: Number(r.balance),
-    crown: null as NexaRankRow['crown'],
-    crownEligible: false,
+    rank: Number(r.rank), userId: String(r.user_id), username: r.username,
+    displayName: r.display_name, avatarUrl: r.avatar_url, score: Number(r.score),
+    posts7d: Number(r.posts_7d), likes7d: Number(r.likes_7d), comments7d: Number(r.comments_7d),
+    followers: Number(r.followers), uniqueCommenters7d: Number(r.unique_commenters_7d),
+    balance: Number(r.balance), crown: null as NexaRankRow['crown'], crownEligible: false,
   }));
 
   for (const row of rows) {
@@ -91,25 +70,19 @@ export async function calculateNexaRanking(limit = 50): Promise<NexaRankRow[]> {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
-    await client.query(`UPDATE nexa_crowns SET revoked_at = NOW() WHERE revoked_at IS NULL`);
+    await client.query('UPDATE nexa_crowns SET revoked_at = NOW() WHERE revoked_at IS NULL');
     for (const row of rows) {
-      await client.query(`
-        INSERT INTO nexa_score_snapshots (user_id, period, score, rank, measured_at)
+      await client.query(`INSERT INTO nexa_score_snapshots (user_id, period, score, rank, measured_at)
         VALUES ($1, 'rolling_7d', $2, $3, NOW())
-        ON CONFLICT (user_id, period)
-        DO UPDATE SET score = EXCLUDED.score, rank = EXCLUDED.rank, measured_at = EXCLUDED.measured_at
-      `, [row.userId, row.score, row.rank]);
-      if (row.crown) {
-        await client.query(`INSERT INTO nexa_crowns (user_id, level) VALUES ($1, $2)`, [row.userId, row.crown]);
-      }
+        ON CONFLICT (user_id, period) DO UPDATE SET score = EXCLUDED.score, rank = EXCLUDED.rank, measured_at = EXCLUDED.measured_at`,
+        [row.userId, row.score, row.rank]);
+      if (row.crown) await client.query('INSERT INTO nexa_crowns (user_id, level) VALUES ($1, $2)', [row.userId, row.crown]);
     }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
 
   return rows;
 }
