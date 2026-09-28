@@ -38,7 +38,7 @@ export default function ProfilePage(){
  const connectionPeople=connections==='followers'?followers:following;
 
  return <main className="shell">
-  <aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Home</Link><Link className="active" href="/profile">Profile</Link><Link href="/search">Search</Link><Link href="/messages">Messages</Link><Link href="/notifications">Notifications</Link><Link href="/settings">Settings</Link></nav></aside>
+  <aside className="sidebar"><div className="brand">NEXA<span>.</span></div><nav><Link href="/">Home</Link><Link href="/search">Search</Link><Link href="/messages">Messages</Link><Link href="/notifications">Notifications</Link><Link className="active" href="/profile">Profile</Link><Link href="/settings">Settings</Link></nav></aside>
   <section className="feed">
    <header className="topbar"><div><p className="eyebrow">YOUR SPACE</p><h1>Профиль</h1></div><Link className="avatar" style={{overflow:'hidden'}} href="/profile">{user.avatarUrl?<img src={user.avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>:initial}</Link></header>
    <section className="profile-hero"><div className="profile-cover"/><div className="profile-main">
