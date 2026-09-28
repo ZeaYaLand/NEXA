@@ -40,7 +40,10 @@ export default function ProfilePage(){
  const joinedLabel=Number.isNaN(joined.getTime())?'Недавно':joined.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
  const connectionPeople=connections==='followers'?followers:following;
  const connectionsModal=connections && <div className={styles.profileConnectionsBackdrop} role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setConnections(null)}}><section className={styles.profileConnections} role="dialog" aria-modal="true" aria-labelledby="connections-title"><div className={styles.profileConnectionsHead}><div><p className="eyebrow">NEXA NETWORK</p><h3 id="connections-title">{connections==='followers'?'Твои подписчики':'Твои подписки'}</h3></div><button type="button" className={styles.profileConnectionsClose} aria-label="Закрыть" onClick={()=>setConnections(null)}>×</button></div>
-    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className={styles.profilePeopleList}>{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className={styles.profilePerson}><span className="mini-avatar gradient">{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span><span><strong>{person.displayName||person.username}</strong><small>@{person.username}</small></span></Link>)}</div>}
+    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className={styles.profilePeopleList}>{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className={styles.profilePerson}>
+      <span className={styles.profilePersonAvatar}>{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span>
+      <span className={styles.profilePersonInfo}><strong>{person.displayName||person.username}</strong><small>@{person.username}</small><em>Открыть профиль →</em></span>
+    </Link>)}</div>}
    </section></div>;
 
  return <main className="shell">
