@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Visibility } from './social';
+import type { Visibility } from './types';
 
 export async function createPost(
   authorId: string,
