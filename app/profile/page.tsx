@@ -1,6 +1,6 @@
 'use client';
 
-import './profile.module.css';
+import styles from './profile.module.css';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -45,16 +45,16 @@ export default function ProfilePage(){
     <div className="profile-avatar gradient">{user.avatarUrl?<img src={user.avatarUrl} alt="Аватар"/>:initial}</div>
     <div className="profile-actions"><button className="profile-action primary" onClick={()=>{setError('');setEditing(true)}}>Редактировать</button><button className="profile-action secondary" onClick={logout}>Выйти</button></div>
     <h2>{user.displayName||user.username}</h2><p className="profile-username">@{user.username}</p>{user.bio?<p className="profile-bio">{user.bio}</p>:<p className="profile-bio muted">Добавь описание профиля</p>}<p className="profile-email">{user.email}</p>
-    <div className="profile-stats-grid">
-     <div className="profile-stat"><strong>{posts.length}</strong><span>Публикации</span></div>
-     <button type="button" className="profile-stat profile-stat-button" onClick={()=>refreshConnections('followers')}><strong>{followers.length}</strong><span>Подписчики</span></button>
-     <button type="button" className="profile-stat profile-stat-button" onClick={()=>refreshConnections('following')}><strong>{following.length}</strong><span>Подписки</span></button>
-     <div className="profile-stat"><strong>NEXA</strong><span>В NEXA с {joinedLabel}</span></div>
+    <div className={styles.profileStatsGrid}>
+     <div className={styles.profileStat}><strong>{posts.length}</strong><span>Публикации</span></div>
+     <button type="button" className={`${styles.profileStat} ${styles.profileStatButton}`} onClick={()=>refreshConnections('followers')}><strong>{followers.length}</strong><span>Подписчики</span></button>
+     <button type="button" className={`${styles.profileStat} ${styles.profileStatButton}`} onClick={()=>refreshConnections('following')}><strong>{following.length}</strong><span>Подписки</span></button>
+     <div className={styles.profileStat}><strong>NEXA</strong><span>В NEXA с {joinedLabel}</span></div>
     </div>
    </div></section>
 
-   {connections && <section className="profile-connections"><div className="profile-connections-head"><div><p className="eyebrow">NEXA NETWORK</p><h3>{connections==='followers'?'Твои подписчики':'Твои подписки'}</h3></div><button type="button" className="profile-connections-close" onClick={()=>setConnections(null)}>×</button></div>
-    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className="profile-people-list">{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className="profile-person"><span className="mini-avatar gradient">{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span><span><strong>{person.displayName||person.username}</strong><small>@{person.username}</small></span></Link>)}</div>}
+   {connections && <section className={styles.profileConnections}><div className={styles.profileConnectionsHead}><div><p className="eyebrow">NEXA NETWORK</p><h3>{connections==='followers'?'Твои подписчики':'Твои подписки'}</h3></div><button type="button" className={styles.profileConnectionsClose} onClick={()=>setConnections(null)}>×</button></div>
+    {connectionsLoading?<p className="muted">Загрузка…</p>:connectionPeople.length===0?<p className="muted">Пока здесь никого нет.</p>:<div className={styles.profilePeopleList}>{connectionPeople.map(person=><Link key={person.id} href={`/users/${person.username}`} onClick={()=>setConnections(null)} className={styles.profilePerson}><span className="mini-avatar gradient">{person.avatarUrl?<img src={person.avatarUrl} alt=""/>:((person.displayName||person.username)[0]?.toUpperCase()||'N')}</span><span><strong>{person.displayName||person.username}</strong><small>@{person.username}</small></span></Link>)}</div>}
    </section>}
 
    <div className="profile-tabs"><button className="selected">Посты <span style={{opacity:.6}}>· {posts.length}</span></button><button disabled>Медиа</button><button disabled>Лайки</button></div>
