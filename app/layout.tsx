@@ -3,7 +3,6 @@ import "./globals.css";
 import "./mobile-fix.css";
 import PresenceSync from "./presence-sync";
 import MobileMoreMenu from "@/components/MobileMoreMenu";
-import MessageModeSwitch from "@/components/MessageModeSwitch";
 
 export const metadata: Metadata = {
   title: "NEXA",
@@ -17,7 +16,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {children}
         <PresenceSync />
         <MobileMoreMenu />
-        <MessageModeSwitch />
         <style>{`
           @media (max-width: 760px) {
             /* Hide only the legacy desktop/mobile bottom navigation. Do NOT hide the new mobile menu panel. */
