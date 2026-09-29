@@ -1,5 +1,8 @@
 import { db } from '../db';
 
+/** Supported visibility levels for NEXA user content. */
+export type Visibility = 'public' | 'followers' | 'private';
+
 export async function followUser(followerId: string, followingId: string) {
   if (followerId === followingId) throw new Error('SELF_FOLLOW_NOT_ALLOWED');
   await db.query(
