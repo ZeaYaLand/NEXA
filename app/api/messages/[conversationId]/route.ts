@@ -3,6 +3,12 @@ import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 type Params = { params: Promise<{ conversationId: string }> };
+type MessageRow = {
+  id: string; content: string; created_at: string; edited_at: string | null; deleted_at: string | null;
+  deleted_for_all: boolean; sender_id: string; media_url: string | null; media_type: string | null;
+  file_name: string | null; file_size: number | null; mime_type: string | null; media_duration_seconds: number | null;
+  reply_to_message_id: string | null; forwarded_from_message_id: string | null; username: string; displayName: string | null;
+};
 
 function mediaViewUrl(value: unknown) {
   if (typeof value !== 'string' || !value) return value ?? null;
@@ -11,14 +17,7 @@ function mediaViewUrl(value: unknown) {
 }
 
 async function blockedByDirectMember(conversationId: string, userId: string) {
-  const r = await db.query(
-    `SELECT 1 FROM conversations c
-     JOIN conversation_members other ON other.conversation_id=c.id AND other.user_id<>$2
-     JOIN nexa_blocks b ON (b.blocker_id=$2 AND b.blocked_id=other.user_id)
-                         OR (b.blocker_id=other.user_id AND b.blocked_id=$2)
-     WHERE c.id=$1 AND c.type='direct' LIMIT 1`,
-    [conversationId, userId]
-  );
+  const r = await db.query(`SELECT 1 FROM conversations c JOIN conversation_members other ON other.conversation_id=c.id AND other.user_id<>$2 JOIN nexa_blocks b ON (b.blocker_id=$2 AND b.blocked_id=other.user_id) OR (b.blocker_id=other.user_id AND b.blocked_id=$2) WHERE c.id=$1 AND c.type='direct' LIMIT 1`, [conversationId, userId]);
   return !!r.rowCount;
 }
 
@@ -30,9 +29,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const member = await db.query('SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
     if (!member.rowCount) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
-    const r = await db.query(`SELECT m.id,m.content,m.created_at,m.edited_at,m.deleted_at,m.deleted_for_all,m.sender_id,m.media_url,m.media_type,m.file_name,m.file_size,m.mime_type,m.media_duration_seconds,m.reply_to_message_id,m.forwarded_from_message_id,u.username,u.display_name AS "displayName" FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.conversation_id=$1 ORDER BY m.created_at ASC LIMIT 200`, [conversationId]);
+    const r = await db.query<MessageRow>(`SELECT m.id,m.content,m.created_at,m.edited_at,m.deleted_at,m.deleted_for_all,m.sender_id,m.media_url,m.media_type,m.file_name,m.file_size,m.mime_type,m.media_duration_seconds,m.reply_to_message_id,m.forwarded_from_message_id,u.username,u.display_name AS "displayName" FROM messages m JOIN users u ON u.id=m.sender_id WHERE m.conversation_id=$1 ORDER BY m.created_at ASC LIMIT 200`, [conversationId]);
     await db.query('UPDATE conversation_members SET last_read_at=NOW() WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
-    return NextResponse.json({ messages: r.rows.map(m => ({ ...m, media_url: mediaViewUrl(m.media_url) })) });
+    return NextResponse.json({ messages: r.rows.map((m: MessageRow) => ({ ...m, media_url: mediaViewUrl(m.media_url) })) });
   } catch (error) {
     console.error('GET conversation messages error:', error);
     return NextResponse.json({ error: 'Не удалось загрузить сообщения' }, { status: 500 });
@@ -47,10 +46,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const member = await db.query('SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
     if (!member.rowCount) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
-
     let b: Record<string, unknown>;
     try { b = await req.json(); } catch { return NextResponse.json({ error: 'Некорректные данные сообщения' }, { status: 400 }); }
-
     const content = String(b.content || '').trim();
     const mediaUrl = b.mediaUrl ? String(b.mediaUrl) : null;
     const mediaType = b.mediaType ? String(b.mediaType) : null;
@@ -59,7 +56,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const mimeType = b.mimeType ? String(b.mimeType) : null;
     const mediaDuration = b.mediaDuration == null ? null : Number(b.mediaDuration);
     const replyToMessageId = b.replyToMessageId ? String(b.replyToMessageId) : null;
-
     if (!content && !mediaUrl) return NextResponse.json({ error: 'Сообщение пустое' }, { status: 400 });
     if (content.length > 5000) return NextResponse.json({ error: 'Сообщение слишком длинное' }, { status: 400 });
     if (mediaUrl && !mediaUrl.startsWith(`messages/${conversationId}/${user.id}/`)) return NextResponse.json({ error: 'Некорректный файл' }, { status: 400 });
@@ -68,7 +64,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       const reply = await db.query('SELECT 1 FROM messages WHERE id=$1 AND conversation_id=$2 LIMIT 1', [replyToMessageId, conversationId]);
       if (!reply.rowCount) return NextResponse.json({ error: 'Сообщение для ответа не найдено' }, { status: 400 });
     }
-
     const r = await db.query(`INSERT INTO messages(conversation_id,sender_id,content,media_url,media_type,file_name,file_size,mime_type,media_duration_seconds,reply_to_message_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id,content,created_at,sender_id,media_url,media_type,file_name,file_size,mime_type,media_duration_seconds,reply_to_message_id,forwarded_from_message_id,edited_at,deleted_at,deleted_for_all`, [conversationId, user.id, content || ' ', mediaUrl, mediaType, fileName, fileSize, mimeType, mediaDuration, replyToMessageId]);
     const row = r.rows[0];
     return NextResponse.json({ message: { ...row, media_url: mediaViewUrl(row.media_url), username: user.username, displayName: user.displayName } }, { status: 201 });
