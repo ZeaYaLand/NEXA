@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const kindParam = new URL(req.url).searchParams.get('kind');
-    const kind: 'video' | 'music' | null = kindParam === 'video' || kindParam === 'music' ? kindParam : null;
+    const kind: 'photo' | 'video' | 'music' | null = kindParam === 'photo' || kindParam === 'video' || kindParam === 'music' ? kindParam : null;
     const values: string[] = [];
     const where = kind ? 'WHERE m.kind=$1' : '';
     if (kind) values.push(kind);
@@ -59,9 +59,11 @@ export async function POST(req: NextRequest) {
     const title = String(body.title || '').trim().slice(0, 160);
     const description = String(body.description || '').slice(0, 2000);
     const coverKey = body.coverKey ? String(body.coverKey) : null;
-    const validVideo = kind === 'video' && mediaKey.startsWith(`library/${user.id}/`) && mimeType.startsWith('video/');
-    const validMusic = kind === 'music' && mediaKey.startsWith(`library/${user.id}/`) && mimeType.startsWith('audio/');
-    if ((!validVideo && !validMusic) || !title) return NextResponse.json({ error: 'Укажите название и корректный видео/аудиофайл' }, { status: 400 });
+    const ownedKey = mediaKey.startsWith(`library/${user.id}/`);
+    const validPhoto = kind === 'photo' && ownedKey && mimeType.startsWith('image/');
+    const validVideo = kind === 'video' && ownedKey && mimeType.startsWith('video/');
+    const validMusic = kind === 'music' && ownedKey && mimeType.startsWith('audio/');
+    if ((!validPhoto && !validVideo && !validMusic) || !title) return NextResponse.json({ error: 'Укажите название и корректный медиафайл' }, { status: 400 });
     if (coverKey && !coverKey.startsWith(`library/${user.id}/`)) return NextResponse.json({ error: 'Недопустимая обложка' }, { status: 403 });
     const id = crypto.randomUUID();
     const result = await db.query(`
@@ -73,6 +75,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ item: { ...item, username: user.username, liked: false, media_url: `/api/media/presign?key=${encodeURIComponent(mediaKey)}`, cover_url: coverKey ? `/api/media/presign?key=${encodeURIComponent(coverKey)}` : null } }, { status: 201 });
   } catch (error) {
     console.error('POST /api/media-library', error);
-    return NextResponse.json({ error: 'Не удалось опубликовать медиа' }, { status: 500 });
+    return NextResponse.json({ error: 'Не удалось сохранить медиа' }, { status: 500 });
   }
 }
