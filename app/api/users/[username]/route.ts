@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { canViewUserContent } from '@/lib/nexa-core/privacy';
 import type { Visibility } from '@/lib/nexa-core/types';
 
+type BlockRow = { blocker_id: string };
+
 export async function GET(_request: Request, { params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   try {
@@ -12,12 +14,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
     const profile = result.rows[0];
     const current = await getCurrentUser();
 
-    const blocked = current && current.id !== profile.id ? await db.query(
+    const blocked = current && current.id !== profile.id ? await db.query<BlockRow>(
       'SELECT blocker_id FROM nexa_blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',
       [current.id, profile.id]
-    ) : { rows: [] };
-    const blockedByMe = blocked.rows.some(row => row.blocker_id === current?.id);
-    const blockedByThem = blocked.rows.some(row => row.blocker_id === profile.id);
+    ) : { rows: [] as BlockRow[] };
+    const blockedByMe = blocked.rows.some((row: BlockRow) => row.blocker_id === current?.id);
+    const blockedByThem = blocked.rows.some((row: BlockRow) => row.blocker_id === profile.id);
     if (blockedByMe || blockedByThem) {
       return NextResponse.json({ user: profile, followers: 0, following: 0, isFollowing: false, isSelf: false, blocked: true, posts: [] });
     }
