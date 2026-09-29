@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./mobile-fix.css";
+import "./nexa-design.css";
 import PresenceSync from "./presence-sync";
 import MobileMoreMenu from "@/components/MobileMoreMenu";
 
@@ -18,7 +19,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <MobileMoreMenu />
         <style>{`
           @media (max-width: 760px) {
-            /* Hide only the legacy desktop/mobile bottom navigation. Do NOT hide the new mobile menu panel. */
             body aside:not(.mobile-main-menu-panel) {
               display: none !important;
               visibility: hidden !important;
@@ -45,10 +45,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               padding-bottom:16px !important;
             }
 
-            .feed {
-              padding-bottom:24px !important;
-            }
-
+            .feed { padding-bottom:24px !important; }
             .mobile-main-menu { display:block !important; }
             .mobile-main-menu-trigger {
               display:flex !important;
@@ -108,9 +105,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             .mobile-main-menu-list a small { margin-left:auto !important; color:#747c8d !important; font-size:10px !important; }
             .mobile-main-menu-list a.is-active { color:#fff !important; background:linear-gradient(110deg,rgba(255,39,108,.15),rgba(87,94,255,.18)) !important; border-color:#30364a !important; }
           }
-          @media (min-width: 761px) {
-            .mobile-main-menu { display:none !important; }
-          }
+          @media (min-width: 761px) { .mobile-main-menu { display:none !important; } }
         `}</style>
       </body>
     </html>
