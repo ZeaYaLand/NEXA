@@ -2,11 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
+type ConversationRow = {
+  id: string;
+  type: string;
+  title: string | null;
+  username: string | null;
+  description: string | null;
+  avatar_url: string | null;
+  is_public: boolean;
+  created_at: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number | string | null;
+  members: unknown[];
+};
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const r = await db.query(`
+  const r = await db.query<ConversationRow>(`
     SELECT c.id,c.type,c.title,c.username,c.description,c.avatar_url,c.is_public,c.created_at,
       latest.content AS last_message,latest.created_at AS last_message_at,
       COALESCE(unread.unread_count,0)::int AS unread_count,
@@ -28,7 +43,7 @@ export async function GET() {
     ORDER BY COALESCE(latest.created_at,c.created_at) DESC
   `, [user.id]);
 
-  const unreadTotal = r.rows.reduce((n, c) => n + Number(c.unread_count || 0), 0);
+  const unreadTotal = r.rows.reduce((n: number, c: ConversationRow) => n + Number(c.unread_count || 0), 0);
   return NextResponse.json({ conversations: r.rows, unreadTotal });
 }
 
