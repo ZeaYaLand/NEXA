@@ -52,6 +52,18 @@ async function member(conversationId: string, userId: string) {
   return r.rows[0] as { role?: string } | undefined;
 }
 
+async function blockedByDirectMember(conversationId: string, userId: string) {
+  const r = await db.query(
+    `SELECT 1 FROM conversations c
+     JOIN conversation_members other ON other.conversation_id=c.id AND other.user_id<>$2
+     JOIN nexa_blocks b ON (b.blocker_id=$2 AND b.blocked_id=other.user_id)
+                         OR (b.blocker_id=other.user_id AND b.blocked_id=$2)
+     WHERE c.id=$1 AND c.type='direct' LIMIT 1`,
+    [conversationId, userId]
+  );
+  return !!r.rowCount;
+}
+
 async function messageInConversation(messageId: string, conversationId: string) {
   const r = await db.query(
     `SELECT id, conversation_id, sender_id, content, media_url, media_type,
@@ -77,6 +89,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     const { conversationId } = await params;
     const m = await member(conversationId, user.id);
     if (!m) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'pinned';
@@ -134,6 +147,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { conversationId } = await params;
     const m = await member(conversationId, user.id);
     if (!m) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
 
     let body: Record<string, unknown>;
     try { body = await req.json(); } catch { return NextResponse.json({ error: 'Некорректные данные' }, { status: 400 }); }
