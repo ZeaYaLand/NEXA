@@ -3,8 +3,7 @@ import type { Visibility } from './types';
 
 export async function canViewUserContent(viewerId: string | null, ownerId: string, visibility: Visibility) {
   if (viewerId === ownerId) return true;
-  if (visibility === 'public') return true;
-  if (!viewerId) return false;
+  if (!viewerId) return visibility === 'public';
 
   const blocked = await db.query(
     `SELECT 1 FROM nexa_blocks
@@ -15,6 +14,7 @@ export async function canViewUserContent(viewerId: string | null, ownerId: strin
   );
   if (blocked.rowCount) return false;
 
+  if (visibility === 'public') return true;
   if (visibility === 'private') return false;
 
   const follow = await db.query(
