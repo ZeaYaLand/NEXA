@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
+type StoryRow = {
+  id: string;
+  user_id: string;
+  media_key: string;
+  media_type: string;
+  caption: string | null;
+  created_at: string;
+  expires_at: string;
+  view_count: number;
+  username: string;
+};
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const result = await db.query(`
+    const result = await db.query<StoryRow>(`
       SELECT s.id, s.user_id, s.media_key, s.media_type, s.caption, s.created_at, s.expires_at, s.view_count,
              u.username
       FROM stories s JOIN users u ON u.id=s.user_id
@@ -25,7 +37,7 @@ export async function GET() {
       ORDER BY s.created_at DESC
       LIMIT 100
     `, [user.id]);
-    return NextResponse.json({ stories: result.rows.map((s) => ({ ...s, media_url: `/api/media/presign?key=${encodeURIComponent(s.media_key)}` })) });
+    return NextResponse.json({ stories: result.rows.map((s: StoryRow) => ({ ...s, media_url: `/api/media/presign?key=${encodeURIComponent(s.media_key)}` })) });
   } catch (error) {
     console.error('GET /api/stories', error);
     return NextResponse.json({ error: 'Не удалось загрузить истории' }, { status: 500 });
