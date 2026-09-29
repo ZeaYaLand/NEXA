@@ -24,14 +24,15 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const kind = new URL(req.url).searchParams.get('kind');
+    const kindParam = new URL(req.url).searchParams.get('kind');
+    const kind: 'video' | 'music' | null = kindParam === 'video' || kindParam === 'music' ? kindParam : null;
     const values: string[] = [];
-    const where = kind === 'video' || kind === 'music' ? 'WHERE m.kind=$1' : '';
-    if (where) values.push(kind);
+    const where = kind ? 'WHERE m.kind=$1' : '';
+    if (kind) values.push(kind);
     const result = await db.query<MediaRow>(`
       SELECT m.id,m.user_id,m.kind,m.media_key,m.mime_type,m.title,m.description,m.cover_key,m.created_at,m.like_count,m.comment_count,
              u.username,
-             EXISTS(SELECT 1 FROM media_likes ml WHERE ml.media_id=m.id AND ml.user_id=$${values.length+1}) AS liked
+             EXISTS(SELECT 1 FROM media_likes ml WHERE ml.media_id=m.id AND ml.user_id=$${values.length + 1}) AS liked
       FROM media_items m JOIN users u ON u.id=m.user_id
       ${where}
       ORDER BY m.created_at DESC
