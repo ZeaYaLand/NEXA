@@ -1,5 +1,5 @@
 import { db } from '../db';
-import type { Visibility } from './social';
+import type { Visibility } from './types';
 
 export async function canViewUserContent(viewerId: string | null, ownerId: string, visibility: Visibility) {
   if (viewerId === ownerId) return true;
