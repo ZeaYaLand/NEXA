@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { ensureSocialMediaSchema } from '@/lib/social-media-schema';
+
+type MediaRow = {
+  id: string;
+  user_id: string;
+  kind: string;
+  media_key: string;
+  mime_type: string;
+  title: string;
+  description: string | null;
+  cover_key: string | null;
+  created_at: string;
+  like_count: number;
+  comment_count: number;
+  username: string;
+  liked: boolean;
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -9,12 +24,11 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    await ensureSocialMediaSchema();
     const kind = new URL(req.url).searchParams.get('kind');
     const values: string[] = [];
     const where = kind === 'video' || kind === 'music' ? 'WHERE m.kind=$1' : '';
-    if (where) values.push(kind!);
-    const result = await db.query(`
+    if (where) values.push(kind);
+    const result = await db.query<MediaRow>(`
       SELECT m.id,m.user_id,m.kind,m.media_key,m.mime_type,m.title,m.description,m.cover_key,m.created_at,m.like_count,m.comment_count,
              u.username,
              EXISTS(SELECT 1 FROM media_likes ml WHERE ml.media_id=m.id AND ml.user_id=$${values.length+1}) AS liked
@@ -37,7 +51,6 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    await ensureSocialMediaSchema();
     const body = await req.json();
     const kind = String(body.kind || '');
     const mediaKey = String(body.mediaKey || '');
