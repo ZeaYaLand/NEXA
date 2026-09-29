@@ -14,7 +14,7 @@ async function blockedByDirectMember(conversationId: string, userId: string) {
   const r = await db.query(
     `SELECT 1 FROM conversations c
      JOIN conversation_members other ON other.conversation_id=c.id AND other.user_id<>$2
-     JOIN user_blocks b ON (b.blocker_id=$2 AND b.blocked_id=other.user_id)
+     JOIN nexa_blocks b ON (b.blocker_id=$2 AND b.blocked_id=other.user_id)
                          OR (b.blocker_id=other.user_id AND b.blocked_id=$2)
      WHERE c.id=$1 AND c.type='direct' LIMIT 1`,
     [conversationId, userId]
@@ -22,24 +22,11 @@ async function blockedByDirectMember(conversationId: string, userId: string) {
   return !!r.rowCount;
 }
 
-async function ensureMessageColumns() {
-  await db.query(`
-    ALTER TABLE messages
-      ADD COLUMN IF NOT EXISTS reply_to_message_id TEXT,
-      ADD COLUMN IF NOT EXISTS forwarded_from_message_id TEXT,
-      ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
-      ADD COLUMN IF NOT EXISTS deleted_for_all BOOLEAN NOT NULL DEFAULT false
-  `);
-}
-
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { conversationId } = await params;
-    await ensureMessageColumns();
-    await db.query('ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMPTZ');
     const member = await db.query('SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
     if (!member.rowCount) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
@@ -57,8 +44,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { conversationId } = await params;
-    await ensureMessageColumns();
-    await db.query('ALTER TABLE conversation_members ADD COLUMN IF NOT EXISTS last_read_at TIMESTAMPTZ');
     const member = await db.query('SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2', [conversationId, user.id]);
     if (!member.rowCount) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     if (await blockedByDirectMember(conversationId, user.id)) return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
