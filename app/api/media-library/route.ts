@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       ${where}
       ORDER BY m.created_at DESC
     `, [...values, user.id]);
-    return NextResponse.json({ items: result.rows.map((m) => ({
+    return NextResponse.json({ items: result.rows.map((m: MediaRow) => ({
       ...m,
       media_url: `/api/media/presign?key=${encodeURIComponent(m.media_key)}`,
       cover_url: m.cover_key ? `/api/media/presign?key=${encodeURIComponent(m.cover_key)}` : null,
