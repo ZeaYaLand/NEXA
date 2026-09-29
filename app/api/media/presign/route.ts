@@ -10,6 +10,32 @@ async function allowedConversation(conversationId: string, userId: string) {
   return !!r.rowCount;
 }
 
+async function allowedStory(storyKey: string, userId: string) {
+  const r = await db.query(`
+    SELECT 1 FROM stories s
+    WHERE s.media_key=$1 AND s.expires_at > NOW()
+      AND NOT EXISTS (
+        SELECT 1 FROM nexa_blocks b
+        WHERE (b.blocker_id=$2 AND b.blocked_id=s.user_id)
+           OR (b.blocker_id=s.user_id AND b.blocked_id=$2)
+      )
+      AND (s.user_id=$2 OR EXISTS (
+        SELECT 1 FROM nexa_follows f WHERE f.follower_id=$2 AND f.following_id=s.user_id
+      ))
+    LIMIT 1`,
+    [storyKey, userId],
+  );
+  return !!r.rowCount;
+}
+
+async function allowedLibraryMedia(key: string) {
+  const r = await db.query(
+    'SELECT 1 FROM media_items WHERE media_key=$1 OR cover_key=$1 LIMIT 1',
+    [key],
+  );
+  return !!r.rowCount;
+}
+
 async function readJsonResponse(response: Response) {
   const text = await response.text();
   if (!text.trim()) return null;
@@ -81,7 +107,16 @@ export async function GET(req: NextRequest) {
     const key = new URL(req.url).searchParams.get('key') || '';
     const parsed = parseKey(key);
     if (!parsed) return jsonError('Некорректный media key', 400);
-    if (parsed.scope === 'message' && !(await allowedConversation(parsed.conversationId, user.id))) return jsonError('Forbidden', 403);
+
+    if (parsed.scope === 'message' && !(await allowedConversation(parsed.conversationId, user.id))) {
+      return jsonError('Forbidden', 403);
+    }
+    if (parsed.scope === 'stories' && !(await allowedStory(key, user.id))) {
+      return jsonError('Forbidden', 403);
+    }
+    if (parsed.scope === 'library' && !(await allowedLibraryMedia(key))) {
+      return jsonError('Media not found', 404);
+    }
 
     let response: Response;
     try {
